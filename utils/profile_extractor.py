@@ -218,7 +218,7 @@ class LinkedInProfileExtractor:
         
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Target div IDs to find and preserve their parent sections
+      
         target_div_ids = ['experience', 'education', 'projects', 'skills', 'about']
         sections_to_keep = []
         
@@ -308,63 +308,79 @@ class LinkedInProfileExtractor:
             return 'about'
         if 'id="projects"' in html_lower or 'projects' in html_lower:
             return 'projects'
-        if 'profile-picture' in html_lower or 'pv-top-card' in html_lower or 'text-heading-xlarge' in html_lower:
-            return 'profile_header'
         
-        return 'unknown'
+        return 'profile_header'
     
     def get_section_extraction_prompt(self, section_type: str, section_html: str) -> str:
         """Get appropriate prompt for OpenAI based on section type."""
-        base_prompt = f"Extract data from this LinkedIn profile HTML section. Return only valid JSON without any markdown formatting or explanations.\n\nHTML:\n{section_html}\n\n"
-        
+        base_prompt = (
+            "Extract data from this LinkedIn profile HTML section. "
+            "Return only valid JSON without any markdown formatting or explanations.\n\n"
+            f"HTML:\n{section_html}\n\n"
+        )
+
         prompts = {
-            'profile_header': base_prompt + """Extract profile header data in this JSON format:
-{
-  "name": "Full Name",
-  "headline": "Job Title/Headline",
-  "location": "City, State, Country",
-  "connections": "X connections",
-  "profileImage": "image_url_if_available"
-}""",
-            
-            'about': base_prompt + """Extract the about/summary section in this JSON format:
-{
-  "summary": "Full about text/summary"
-}""",
-            
-            'experience': base_prompt + """Extract all work experience entries in this JSON format:
-{
-  "experience": [
-    {
-      "title": "Job Title",
-      "company": "Company Name",
-      "date_range": "Start Date - End Date",
-      "duration": "X yrs Y mos",
-      "description": "Job description if available"
-    }
-  ]
-}""",
-            
-            'education': base_prompt + """Extract all education entries in this JSON format:
-{
-  "education": [
-    {
-      "school": "School Name",
-      "degree": "Degree Type",
-      "field_of_study": "Field of Study",
-      "date_range": "Start Date - End Date"
-    }
-  ]
-}""",
-            
-            'skills': base_prompt + """Extract all skills in this JSON format:
-{
-  "skills": ["skill1", "skill2", "skill3"]
-}"""
+            'profile_header': base_prompt + (
+                "Extract profile header data in this JSON format:\n"
+                "{\n"
+                '  "name": "Full Name",\n'
+                '  "headline": "Job Title/Headline",\n'
+                '  "location": "City, State, Country",\n'
+                '  "connections": "X connections",\n'
+                '  "profileImage": "image_url_if_available"\n'
+                "}"
+            ),
+
+            'about': base_prompt + (
+                "Extract the about/summary section in this JSON format:\n"
+                "{\n"
+                '  "summary": "Full about text/summary"\n'
+                "}"
+            ),
+
+            'experience': base_prompt + (
+                "Extract all work experience entries in this JSON format:\n"
+                "{\n"
+                '  "experience": [\n'
+                "    {\n"
+                '      "title": "Job Title",\n'
+                '      "company": "Company Name",\n'
+                '      "date_range": "Start Date - End Date",\n'
+                '      "duration": "X yrs Y mos",\n'
+                '      "description": "Job description if available"\n'
+                "    }\n"
+                "  ]\n"
+                "}"
+            ),
+
+            'education': base_prompt + (
+                "Extract all education entries in this JSON format:\n"
+                "{\n"
+                '  "education": [\n'
+                "    {\n"
+                '      "school": "School Name",\n'
+                '      "degree": "Degree Type",\n'
+                '      "field_of_study": "Field of Study",\n'
+                '      "date_range": "Start Date - End Date"\n'
+                "    }\n"
+                "  ]\n"
+                "}"
+            ),
+
+            'skills': base_prompt + (
+                "Extract all skills in this JSON format:\n"
+                "{\n"
+                '  "skills": ["skill1", "skill2", "skill3"]\n'
+                "}"
+            )
         }
-        
-        return prompts.get(section_type, base_prompt + "Extract any relevant profile information from this section and return it as JSON.")
-    
+
+        # Fallback prompt for unknown section types
+        return prompts.get(
+            section_type,
+            base_prompt + "Extract any relevant profile information from this section and return it as JSON."
+        )
+
     async def merge_extracted_data(self, profile: LinkedInProfile, json_result: str, section_type: str) -> None:
         """Merge extracted data into the profile object."""
         try:
@@ -464,7 +480,7 @@ class LinkedInProfileExtractor:
             
             try:
                 # Determine section type
-                section_type = self.determine_section_type(section_html)
+                section_type = self.determine_section_type(section_html) #unknown
                 logger.info(f"📋 Section type: {section_type}")
                 
                 # Get appropriate prompt
@@ -506,21 +522,138 @@ class LinkedInProfileExtractor:
         logger.info(f"🎉 Profile extraction completed for: {profile.name or 'Unknown'}")
         return profile
     
-    async def scrape_linkedin_profile(self, profile_url: str, use_login: bool = True) -> ExtractionResult:
+    def extract_username_from_url(self, linkedin_url: str) -> str:
+        """Extract username from LinkedIn URL for consistent file naming."""
+        try:
+            # Clean the URL thoroughly
+            clean_url = linkedin_url.strip()
+            
+            # Remove trailing slashes and query parameters
+            clean_url = clean_url.rstrip('/').split('?')[0].split('#')[0]
+            
+            # Extract username part - handle different LinkedIn URL formats
+            if '/in/' in clean_url:
+                # Standard format: https://www.linkedin.com/in/username
+                username = clean_url.split('/in/')[-1]
+            elif '/pub/' in clean_url:
+                # Old format: https://www.linkedin.com/pub/username
+                username = clean_url.split('/pub/')[-1].split('/')[0]
+            else:
+                # Fallback: take the last part after final slash
+                username = clean_url.split('/')[-1]
+            
+            # Clean username thoroughly - remove any remaining slashes and special chars
+            username = username.strip().rstrip('/').strip()
+            
+            # Replace invalid file system characters
+            username = re.sub(r'[^a-zA-Z0-9_-]', '-', username)
+            
+            # Remove multiple consecutive dashes and clean up
+            username = re.sub(r'-+', '-', username).strip('-')
+            
+            # Ensure we have a valid username
+            if not username or username in ['', '-']:
+                username = 'unknown'
+                
+            logger.debug(f"🔗 URL: {linkedin_url} → Username: {username}")
+            return username
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to extract username from {linkedin_url}: {e}")
+            return 'unknown'
+    
+    def check_existing_files(self, username: str) -> Dict[str, Any]:
         """
-        Scrape a single LinkedIn profile.
-        Replicates the scrapeLinkedInProfile function from TypeScript.
+        Comprehensive check if HTML and JSON files already exist for a username.
+        Returns detailed information to minimize unnecessary scraping.
         """
-        start_time = time.time()
-        logger.info(f"🚀 Starting LinkedIn profile extraction for: {profile_url}")
+        html_file = os.path.join(HTML_DIR, f"{username}.html")
+        json_file = os.path.join(JSON_DIR, f"{username}.json")
+        
+        html_exists = os.path.exists(html_file)
+        json_exists = os.path.exists(json_file)
+        
+        # Get file info if they exist
+        html_info = None
+        json_info = None
+        
+        if html_exists:
+            try:
+                html_stat = os.stat(html_file)
+                html_info = {
+                    'size': html_stat.st_size,
+                    'modified': datetime.fromtimestamp(html_stat.st_mtime).isoformat(),
+                    'age_hours': (time.time() - html_stat.st_mtime) / 3600
+                }
+            except Exception as e:
+                logger.warning(f"⚠️ Could not get HTML file info for {username}: {e}")
+        
+        if json_exists:
+            try:
+                json_stat = os.stat(json_file)
+                json_info = {
+                    'size': json_stat.st_size,
+                    'modified': datetime.fromtimestamp(json_stat.st_mtime).isoformat(),
+                    'age_hours': (time.time() - json_stat.st_mtime) / 3600
+                }
+            except Exception as e:
+                logger.warning(f"⚠️ Could not get JSON file info for {username}: {e}")
+        
+        # Log file status for better tracking
+        if html_exists or json_exists:
+            logger.info(f"📁 File check for '{username}':")
+            if html_exists:
+                logger.info(f"   ✅ HTML exists: {html_file} ({html_info['size']} bytes, {html_info['age_hours']:.1f}h old)")
+            else:
+                logger.info(f"   ❌ HTML missing: {html_file}")
+            if json_exists:
+                logger.info(f"   ✅ JSON exists: {json_file} ({json_info['size']} bytes, {json_info['age_hours']:.1f}h old)")
+            else:
+                logger.info(f"   ❌ JSON missing: {json_file}")
+        else:
+            logger.info(f"📁 No existing files found for '{username}' - will need to scrape")
+        
+        return {
+            'html_exists': html_exists,
+            'json_exists': json_exists,
+            'html_path': html_file,
+            'json_path': json_file,
+            'html_info': html_info,
+            'json_info': json_info,
+            'username': username
+        }
+
+    async def scrape_linkedin_profile_html_only(self, profile_url: str, use_login: bool = True) -> Dict[str, Any]:
+        """
+        Scrape LinkedIn profile and save only HTML - no processing.
+        This is the first phase: pure scraping.
+        """
+        username = self.extract_username_from_url(profile_url)
+        logger.info(f"🚀 Starting HTML scraping for: {profile_url} (username: {username})")
+        
+        # COMPREHENSIVE CHECK: Minimize scraping as much as possible
+        file_status = self.check_existing_files(username)
+        if file_status['html_exists']:
+            html_info = file_status['html_info']
+            logger.info(f"🚫 SCRAPING AVOIDED for '{username}' - HTML already exists!")
+            logger.info(f"   💾 File: {file_status['html_path']}")
+            logger.info(f"   📊 Size: {html_info['size']} bytes, Age: {html_info['age_hours']:.1f} hours")
+            logger.info(f"   ⚡ Saved scraping time and resources!")
+            return {
+                'success': True,
+                'username': username,
+                'profile_url': profile_url,
+                'html_path': file_status['html_path'],
+                'skipped': True,
+                'skip_reason': 'html_exists',
+                'file_info': html_info
+            }
         
         try:
             # Check if we need to login
             if use_login:
-                # Check if we have a valid session or need to login
                 current_url = self.page.url if self.page else ""
                 if not current_url or "linkedin.com" not in current_url:
-                    # Try to access a LinkedIn page to test session
                     await self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
                     await self.page.wait_for_timeout(3000)
                     
@@ -544,7 +677,6 @@ class LinkedInProfileExtractor:
                     login_success = await self.login_to_linkedin()
                     if not login_success:
                         raise ProfileExtractionError("Login failed after redirect")
-                    # Retry profile access
                     await self.page.goto(profile_url, wait_until="domcontentloaded")
                 else:
                     raise ProfileExtractionError("Profile requires authentication")
@@ -575,111 +707,298 @@ class LinkedInProfileExtractor:
             # Wait for dynamic content to load
             await self.page.wait_for_timeout(2000)
             
-            # Get profile ID for file naming
-            profile_id = profile_url.split('/')[-1].replace('/', '') or 'unknown'
-            profile_id = re.sub(r'[^a-zA-Z0-9_-]', '_', profile_id)
-            
             # Get page content
             content = await self.page.content()
             
-            # Save original HTML
-            html_filename = os.path.join(HTML_DIR, f"{profile_id}_original.html")
+            # Save HTML with username
+            html_filename = os.path.join(HTML_DIR, f"{username}.html")
             with open(html_filename, 'w', encoding='utf-8') as f:
                 f.write(content)
-            logger.info(f"💾 Saved original HTML to: {html_filename}")
+            logger.info(f"💾 Saved HTML to: {html_filename}")
             
-            # Clean and save cleaned HTML
-            cleaned_html = self.clean_html(content)
-            cleaned_filename = os.path.join(HTML_DIR, f"{profile_id}_cleaned.html")
-            with open(cleaned_filename, 'w', encoding='utf-8') as f:
-                f.write(cleaned_html)
+           
             
-            logger.info(f"💾 Saved cleaned HTML to: {cleaned_filename}")
-            reduction = round((1 - len(cleaned_html)/len(content)) * 100)
-            logger.info(f"📏 HTML size reduced from {len(content)} to {len(cleaned_html)} characters ({reduction}% reduction)")
+            return {
+                'success': True,
+                'username': username,
+                'profile_url': profile_url,
+                'html_path': html_filename,
+                'skipped': False,
+
+            }
+            
+        except Exception as e:
+            error_msg = f"HTML scraping failed: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            
+            return {
+                'success': False,
+                'username': username,
+                'profile_url': profile_url,
+                'error': error_msg,
+
+            }
+
+    def process_html_to_profile(self, username: str, profile_url: str = None) -> ExtractionResult:
+        """
+        Process saved HTML file to extract LinkedIn profile data.
+        This is the second phase: pure processing (no browser needed).
+        """
+        logger.info(f"🔄 Processing HTML for username: {username}")
+        
+        # Check if files exist
+        file_status = self.check_existing_files(username)
+        
+        # If JSON already exists, load and return it - AVOID PROCESSING
+        if file_status['json_exists']:
+            json_info = file_status['json_info']
+            logger.info(f"🚫 PROCESSING AVOIDED for '{username}' - JSON already exists!")
+            logger.info(f"   💾 File: {file_status['json_path']}")
+            logger.info(f"   📊 Size: {json_info['size']} bytes, Age: {json_info['age_hours']:.1f} hours")
+            logger.info(f"   ⚡ Loading existing profile data instead of reprocessing!")
+            try:
+                with open(file_status['json_path'], 'r', encoding='utf-8') as f:
+                    profile_data = json.load(f)
+                profile = LinkedInProfile(**profile_data)
+                logger.info(f"   ✅ Loaded existing profile: {profile.name}")
+                return ExtractionResult(
+                    success=True,
+                    profile=profile
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load existing JSON for {username}: {e}")
+                logger.warning(f"   🔄 Will reprocess HTML file instead")
+        
+        # Check if HTML exists
+        if not file_status['html_exists']:
+            error_msg = f"No HTML file found for username: {username}"
+            logger.error(f"❌ {error_msg}")
+            return ExtractionResult(
+                success=False,
+                error=error_msg
+                
+            )
+        
+        try:
+            # Load HTML content
+            with open(file_status['html_path'], 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            logger.info(f"📄 Loaded HTML file: {file_status['html_path']}")
+            
+            # Clean HTML for processing (but don't save it)
+            cleaned_html = self.clean_html(html_content)
+            reduction = round((1 - len(cleaned_html)/len(html_content)) * 100)
+            logger.info(f"📏 HTML size reduced from {len(html_content)} to {len(cleaned_html)} characters ({reduction}% reduction)")
             
             # Extract structured profile data from cleaned HTML
             logger.info("📊 Extracting data from cleaned HTML...")
-            profile_data = await self.extract_profile_data_from_html(cleaned_html, profile_url)
             
-            # Save JSON
-            json_filename = os.path.join(JSON_DIR, f"{profile_id}.json")
+            # Use the profile_url from parameter or try to reconstruct from username
+            if not profile_url:
+                profile_url = f"https://www.linkedin.com/in/{username}/"
+            
+            # Since this is a sync function calling an async one, we need to handle it
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                profile_data = loop.run_until_complete(
+                    self.extract_profile_data_from_html(cleaned_html, profile_url)
+                )
+            finally:
+                loop.close()
+            
+            # Save JSON with username
+            json_filename = os.path.join(JSON_DIR, f"{username}.json")
             with open(json_filename, 'w', encoding='utf-8') as f:
                 json.dump(profile_data.dict(), f, indent=2, default=str)
             logger.info(f"💾 Saved JSON to: {json_filename}")
             
-            extraction_time = time.time() - start_time
-            
             return ExtractionResult(
                 success=True,
-                profile=profile_data,
-                extraction_time=extraction_time
+                profile=profile_data
             )
             
         except Exception as e:
-            extraction_time = time.time() - start_time
-            error_msg = f"Profile extraction failed: {str(e)}"
+            error_msg = f"HTML processing failed: {str(e)}"
             logger.error(f"❌ {error_msg}")
             
             return ExtractionResult(
                 success=False,
-                error=error_msg,
-                extraction_time=extraction_time
+                error=error_msg
             )
-    
-    async def batch_extract_profiles(self, profile_urls: List[str], use_login: bool = True) -> BatchExtractionResult:
-        """Extract multiple LinkedIn profiles in batch."""
-        start_time = time.time()
-        logger.info(f"🚀 Starting batch extraction of {len(profile_urls)} profiles")
+
+    async def batch_scrape_html_only(self, profile_urls: List[str], use_login: bool = True) -> Dict[str, Any]:
+        """Scrape HTML for multiple LinkedIn profiles - first phase only."""
+        logger.info(f"🚀 Starting batch HTML scraping of {len(profile_urls)} profiles")
+        
+        # LOG ALL URLS BEING PROCESSED
+        logger.info(f"🔗 URLs to be processed in this batch:")
+        for i, url in enumerate(profile_urls, 1):
+            logger.info(f"   {i:2d}. {url}")
         
         results = []
         errors = []
+        skipped = 0
         
         for i, url in enumerate(profile_urls):
-            logger.info(f"\n📍 Processing profile {i + 1}/{len(profile_urls)}: {url}")
+            logger.info(f"\n" + "="*80)
+            logger.info(f"📍 PROCESSING URL {i + 1}/{len(profile_urls)}")
+            logger.info(f"🔗 URL: {url}")
+            username = self.extract_username_from_url(url)
+            logger.info(f"👤 Username: {username}")
+            logger.info(f"="*80)
             
             try:
-                result = await self.scrape_linkedin_profile(url, use_login)
-                if result.success:
-                    results.append(result.profile)
-                    logger.info(f"✅ Successfully extracted: {result.profile.name}")
+                result = await self.scrape_linkedin_profile_html_only(url, use_login)
+                if result['success']:
+                    results.append(result)
+                    if result.get('skipped', False):
+                        skipped += 1
+                        logger.info(f"⏭️ Skipped (already exists): {result['username']}")
+                    else:
+                        logger.info(f"✅ Successfully scraped HTML: {result['username']}")
                 else:
-                    errors.append(f"{url}: {result.error}")
-                    logger.error(f"❌ Failed to extract profile: {result.error}")
+                    errors.append(f"{url}: {result.get('error', 'Unknown error')}")
+                    logger.error(f"❌ Failed to scrape HTML: {result.get('error', 'Unknown error')}")
                 
                 # Add delay between requests
-                if i < len(profile_urls) - 1:
+                if i < len(profile_urls) - 1 and not result.get('skipped', False):
                     logger.info(f"⏳ Waiting {REQUEST_DELAY} seconds before next profile...")
                     await asyncio.sleep(REQUEST_DELAY)
                     
             except Exception as e:
                 error_msg = f"{url}: {str(e)}"
                 errors.append(error_msg)
-                logger.error(f"❌ Failed to extract profile {url}: {e}")
+                logger.error(f"❌ Failed to scrape HTML for {url}: {e}")
         
-        end_time = time.time()
-        total_time = end_time - start_time
+        logger.info(f"\n📊 SCRAPING EFFICIENCY REPORT:")
+        logger.info(f"   🎯 Total profiles requested: {len(profile_urls)}")
+        logger.info(f"   ✅ Successfully scraped (new): {len(results) - skipped}")
+        logger.info(f"   🚫 SCRAPING AVOIDED (cached): {skipped}")
+        logger.info(f"   ❌ Failed: {len(errors)}")
+        logger.info(f"   ⚡ Efficiency: {(skipped / len(profile_urls) * 100):.1f}% scraping avoided!")
+        
+        if skipped > 0:
+            logger.info(f"   💰 Resources saved by avoiding {skipped} unnecessary scrapes!")
+        
+        return {
+            'total_profiles': len(profile_urls),
+            'successful_scrapes': len(results),
+            'new_scrapes': len(results) - skipped,
+            'skipped_scrapes': skipped,
+            'failed_scrapes': len(errors),
+            'results': results,
+            'errors': errors
+        }
+
+    def batch_process_html_to_profiles(self, usernames: List[str]) -> BatchExtractionResult:
+        """Process multiple HTML files to extract profile data - second phase only."""
+        logger.info(f"🔄 Starting batch HTML processing of {len(usernames)} profiles")
+        
+        results = []
+        errors = []
+        
+        for i, username in enumerate(usernames):
+            logger.info(f"\n📍 Processing HTML {i + 1}/{len(usernames)}: {username}")
+            
+            try:
+                result = self.process_html_to_profile(username)
+                if result.success:
+                    results.append(result.profile)
+                    logger.info(f"✅ Successfully processed: {result.profile.name}")
+                else:
+                    errors.append(f"{username}: {result.error}")
+                    logger.error(f"❌ Failed to process HTML: {result.error}")
+                    
+            except Exception as e:
+                error_msg = f"{username}: {str(e)}"
+                errors.append(error_msg)
+                logger.error(f"❌ Failed to process HTML for {username}: {e}")
         
         # Save batch results
         batch_result = BatchExtractionResult(
-            total_profiles=len(profile_urls),
+            total_profiles=len(usernames),
             successful_extractions=len(results),
             failed_extractions=len(errors),
             profiles=results,
             errors=errors,
-            extraction_started_at=datetime.fromtimestamp(start_time),
-            extraction_completed_at=datetime.fromtimestamp(end_time),
-            total_time=total_time
+            extraction_started_at=datetime.now(),
+            extraction_completed_at=datetime.now()
         )
         
-        batch_filename = os.path.join(JSON_DIR, f"batch_profiles_{int(start_time)}.json")
+        batch_filename = os.path.join(JSON_DIR, f"batch_processed_{int(time.time())}.json")
         with open(batch_filename, 'w', encoding='utf-8') as f:
             json.dump(batch_result.dict(), f, indent=2, default=str)
         
-        logger.info(f"\n💾 Batch results saved to: {batch_filename}")
-        logger.info(f"📊 Successfully extracted {len(results)}/{len(profile_urls)} profiles")
+        logger.info(f"\n💾 Batch processing results saved to: {batch_filename}")
+        logger.info(f"📊 Successfully processed {len(results)}/{len(usernames)} profiles")
         
         return batch_result
+
+
+    async def scrape_linkedin_profile(self, profile_url: str, use_login: bool = True) -> ExtractionResult:
+        """
+        Legacy method: Scrape a single LinkedIn profile (full process).
+        For backward compatibility - combines scraping and processing.
+        """
+        # First scrape HTML
+        html_result = await self.scrape_linkedin_profile_html_only(profile_url, use_login)
+        
+        if not html_result['success']:
+            return ExtractionResult(
+                success=False,
+                error=html_result.get('error', 'Scraping failed')
+            )
+        
+        # Then process HTML if it wasn't skipped
+        if html_result.get('skipped', False):
+            # Check if JSON exists, if so return it
+            username = html_result['username']
+            file_status = self.check_existing_files(username)
+            if file_status['json_exists']:
+                try:
+                    with open(file_status['json_path'], 'r', encoding='utf-8') as f:
+                        profile_data = json.load(f)
+                    profile = LinkedInProfile(**profile_data)
+                    return ExtractionResult(
+                        success=True,
+                        profile=profile
+                    )
+                except Exception as e:
+                    return ExtractionResult(
+                        success=False,
+                        error=f"Failed to load existing JSON: {str(e)}"
+                    )
+        
+        # Process the HTML
+        username = html_result['username']
+        return self.process_html_to_profile(username, profile_url)
+
+    async def batch_extract_profiles(self, profile_urls: List[str], use_login: bool = True) -> BatchExtractionResult:
+        """
+        Legacy method: Extract multiple LinkedIn profiles in batch (full process).
+        For backward compatibility - combines scraping and processing.
+        """
+        # First phase: scrape all HTML
+        html_results = await self.batch_scrape_html_only(profile_urls, use_login)
+        
+        # Extract usernames from successful results
+        usernames = [result['username'] for result in html_results['results'] if result['success']]
+        
+        if not usernames:
+            return BatchExtractionResult(
+                total_profiles=len(profile_urls),
+                successful_extractions=0,
+                failed_extractions=len(profile_urls),
+                profiles=[],
+                errors=html_results['errors'],
+                extraction_started_at=datetime.now(),
+                extraction_completed_at=datetime.now()
+            )
+        
+        # Second phase: process all HTML files
+        return self.batch_process_html_to_profiles(usernames)
 
 
 # Standalone functions for easier usage
@@ -703,4 +1022,30 @@ async def extract_multiple_profiles(profile_urls: List[str], use_login: bool = T
         result = await extract_multiple_profiles(urls)
     """
     async with LinkedInProfileExtractor() as extractor:
-        return await extractor.batch_extract_profiles(profile_urls, use_login) 
+        return await extractor.batch_extract_profiles(profile_urls, use_login)
+
+
+# New standalone functions for the two-phase approach
+async def scrape_html_only(profile_urls: List[str], use_login: bool = True) -> Dict[str, Any]:
+    """
+    Standalone function to only scrape HTML from LinkedIn profiles.
+    Phase 1 of the two-phase approach.
+    
+    Example usage:
+        html_results = await scrape_html_only(["https://www.linkedin.com/in/example1/"])
+    """
+    async with LinkedInProfileExtractor() as extractor:
+        return await extractor.batch_scrape_html_only(profile_urls, use_login)
+
+
+def process_html_files(usernames: List[str]) -> BatchExtractionResult:
+    """
+    Standalone function to process HTML files and extract profile data.
+    Phase 2 of the two-phase approach - no browser needed.
+    
+    Example usage:
+        usernames = ["johndoe", "janedoe"]
+        profiles = process_html_files(usernames)
+    """
+    extractor = LinkedInProfileExtractor()
+    return extractor.batch_process_html_to_profiles(usernames) 

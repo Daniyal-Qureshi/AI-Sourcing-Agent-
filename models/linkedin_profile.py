@@ -81,7 +81,6 @@ class ExtractionResult(BaseModel):
     success: bool = Field(..., description="Whether extraction was successful")
     profile: Optional[LinkedInProfile] = Field(None, description="Extracted profile data")
     error: Optional[str] = Field(None, description="Error message if extraction failed")
-    extraction_time: Optional[float] = Field(None, description="Time taken for extraction in seconds")
     
     
 class BatchExtractionResult(BaseModel):
@@ -93,7 +92,6 @@ class BatchExtractionResult(BaseModel):
     errors: List[str] = Field(..., description="List of error messages")
     extraction_started_at: datetime = Field(..., description="When batch extraction started")
     extraction_completed_at: datetime = Field(..., description="When batch extraction completed")
-    total_time: float = Field(..., description="Total time taken for batch extraction in seconds")
     
     class Config:
         json_encoders = {

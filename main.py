@@ -1,388 +1,401 @@
 """
-LinkedIn Profile Extractor - Main Application
-Combines Google search functionality with LinkedIn profile extraction using OpenAI
+LinkedIn Profile Sourcing FastAPI Server
 """
 import asyncio
-import json
 import logging
-import os
+import uuid
 import time
-from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager
 
-from config.settings import (
-    validate_config,
-    DEFAULT_SEARCH_QUERY,
-    MAX_PROFILES,
-    LOG_LEVEL,
-    LOG_FORMAT
-)
-from models.linkedin_profile import (
-    LinkedInProfile,
-    SearchResult,
-    BatchExtractionResult
-)
-from utils.google_search import search_linkedin_profiles
-from utils.profile_extractor import (
-    LinkedInProfileExtractor,
-    extract_single_profile,
-    extract_multiple_profiles
+from typing import Literal
+
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+
+from models.api_models import (
+    JobRequest,
+    JobResponse,
+    JobStatus,
+    CandidateInfo,
+    SearchResults
 )
 
+from utils.redis_cache import RedisCache, generate_cache_key
+from utils.enhanced_workflow import (
+    search_with_rapid_api_and_score, 
+    search_with_playwright_and_score,
+    search_with_playwright_two_phase_and_score,
+    process_job_rapid_api, 
+    process_job_playwright,
+    process_job_playwright_two_phase
+)
+from arq import create_pool
+from arq.connections import RedisSettings
 # Setup logging
-logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
+# Global ARQ pool for job processing
+arq_pool = None
 
-class LinkedInSourcer:
+
+
+def run_async_task(coro):
     """
-    Main LinkedIn sourcing class that combines search and extraction.
+    Safely runs an async coroutine from a sync context,
+    handling both running and non-running event loops.
     """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No event loop running: safe to use asyncio.run()
+        return asyncio.run(coro)
+    else:
+        # Event loop is running: create a new task and wait for result
+        future = asyncio.ensure_future(coro)
+        return loop.run_until_complete(future)
+
+def get_playwright_results(job_description: str, limit: int):
+    async def run_playwright():
+        return await search_with_playwright_and_score(
+            job_description=job_description,
+            limit=limit
+        )
+
+    return run_async_task(run_playwright())
     
-    def __init__(self):
-        self.search_results: Optional[SearchResult] = None
-        self.extraction_results: Optional[BatchExtractionResult] = None
-        
-    async def search_profiles(self, search_terms: List[str], max_results: int = MAX_PROFILES) -> SearchResult:
-        """Search for LinkedIn profiles using Google."""
-        logger.info("🔍 Starting LinkedIn profile search...")
-        logger.info(f"Search terms: {search_terms}")
-        logger.info(f"Max results: {max_results}")
-        
-        self.search_results = await search_linkedin_profiles(search_terms, max_results)
-        
-        logger.info(f"✅ Search completed: {self.search_results.total_results} profiles found")
-        
-        # Save search results
-        search_filename = f"search_results_{int(time.time())}.json"
-        with open(search_filename, 'w') as f:
-            json.dump(self.search_results.dict(), f, indent=2, default=str)
-        logger.info(f"💾 Search results saved to: {search_filename}")
-        
-        return self.search_results
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    global arq_pool
     
-    async def extract_profiles(self, profile_urls: List[str], use_login: bool = True) -> BatchExtractionResult:
-        """Extract detailed data from LinkedIn profiles."""
-        logger.info(f"📊 Starting profile extraction for {len(profile_urls)} profiles...")
-        
-        self.extraction_results = await extract_multiple_profiles(profile_urls, use_login)
-        
-        success_rate = (self.extraction_results.successful_extractions / 
-                       self.extraction_results.total_profiles * 100)
-        
-        logger.info(f"✅ Extraction completed: {self.extraction_results.successful_extractions}/{self.extraction_results.total_profiles} profiles ({success_rate:.1f}% success)")
-        
-        return self.extraction_results
+    # Startup
+    logger.info("🚀 Starting LinkedIn Sourcing Agent API with ARQ")
+    arq_pool = await create_pool(RedisSettings(host='localhost', port=6379, database=0))
+    logger.info("✅ ARQ system ready")
     
-    async def search_and_extract(self, 
-                                search_terms: List[str], 
-                                max_search_results: int = MAX_PROFILES,
-                                max_extractions: int = None,
-                                use_login: bool = True) -> tuple[SearchResult, BatchExtractionResult]:
-        """
-        Complete workflow: Search for profiles, then extract detailed data.
+    yield
+    
+    # Shutdown  
+    logger.info("🛑 Shutting down LinkedIn Sourcing Agent API")
+    if arq_pool:
+        arq_pool.close()
+        await arq_pool.wait_closed()
+        logger.info("✅ Shutdown complete")
+
+# Create FastAPI app
+app = FastAPI(
+    title="LinkedIn Profile Sourcing API", 
+    description="Scalable LinkedIn profile sourcing with ARQ: Async Redis Queue processing with true concurrency, distributed workers, and smart caching",
+    version="4.0.0",
+    lifespan=lifespan
+)
+
+
+
+
+@app.post("/api/jobs", response_model=JobResponse)
+async def submit_job(
+    job_description: str,
+    search_method: Literal["rapid_api", "playwright", "playwright_two_phase"] = Query(default="rapid_api"),
+    limit: int = 5
+):
+    """
+    Submit a job for processing using ARQ (Async Redis Queue).
+    
+    Args:
+        job_description: The job description to process
+        search_method: "rapid_api", "playwright", or "playwright_two_phase"
+        limit: Maximum number of profiles to process
+    
+    Search Methods:
+    - "rapid_api": Use RapidAPI for profile search (faster, requires API credits)
+    - "playwright": Legacy single-phase browser automation (slower, browser stays open)
+    - "playwright_two_phase": NEW optimized approach (scrape HTML first, then process)
+    
+    The ARQ system provides:
+    - True async/await processing with Redis backend
+    - Scalable distributed workers (up to 10 concurrent jobs)
+    - Single job worker handling complete pipeline end-to-end
+    - Concurrent profile extraction and outreach generation
+    - Smart 7-day profile caching with username-based storage
+    - Automatic retries and job timeout handling
+    - Full pipeline: search → extract → score → outreach
+    """
+    logger.info(f"📝 Received job submission: {search_method}, limit: {limit}")
+    
+    if not job_description or len(job_description.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Job description must be at least 10 characters long")
+    
+    if search_method not in ["rapid_api", "playwright", "playwright_two_phase"]:
+        raise HTTPException(status_code=400, detail="Search method must be 'rapid_api', 'playwright', or 'playwright_two_phase'")
+    
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 50")
+    
+    return await _process_job_request(job_description, search_method, limit)
+
+
+async def _process_job_request(
+    job_description: str,
+    search_method: str,
+    limit: int
+):
+    """
+    Internal job processing logic using ARQ worker.
+    
+    Args:
+        job_description: The job description to process
+        search_method: "rapid_api" or "playwright"
+        limit: Maximum number of profiles to process
+    
+    Returns:
+        JobResponse with job details and status
+    """
+    try:
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
         
-        Args:
-            search_terms: List of search terms for Google search
-            max_search_results: Maximum number of profiles to find in search
-            max_extractions: Maximum number of profiles to extract (if None, extracts all found)
-            use_login: Whether to use LinkedIn login for authenticated access
+        # Generate cache key
+        cache_key = generate_cache_key(
+            job_description, search_method, limit
+        )
+        
+        # Check if results are already cached
+        cached_results = RedisCache.get_cached_results(cache_key)
+        if cached_results:
+            logger.info(f"Job {job_id}: Found cached results, returning immediately")
             
-        Returns:
-            Tuple of (search_results, extraction_results)
-        """
-        start_time = time.time()
-        logger.info("🚀 Starting complete LinkedIn sourcing workflow...")
+            # Create job status as completed
+            RedisCache.update_job_status(job_id, {
+                "job_id": job_id,
+                "status": "completed",
+                "created_at": datetime.now().isoformat(),
+                "started_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),
+                "progress": 100,
+                "message": "Job completed (cached results)",
+                "total_candidates": cached_results.get("total_candidates", 0),
+                "passed_candidates": cached_results.get("passed_candidates", 0)
+            })
+            
+            # Create search results object
+            search_results = SearchResults(
+                job_id=job_id,
+                cached=True,
+                **cached_results
+            )
+            RedisCache.cache_job_results(job_id, search_results.dict())
+            
+            return JobResponse(
+                job_id=job_id,
+                status="completed",
+                message="Job completed immediately (cached results)",
+                estimated_completion_time=datetime.now().isoformat(),
+                data=cached_results
+            )
         
-        # Step 1: Search for profiles
-        search_results = await self.search_profiles(search_terms, max_search_results)
+        # Initialize job status
+        RedisCache.update_job_status(job_id, {
+            "job_id": job_id,
+            "status": "queued",
+            "created_at": datetime.now().isoformat(),
+            "progress": 0,
+            "message": "Job queued for processing with worker system",
+            "processing_mode": "workers"
+        })
         
-        if not search_results.profiles:
-            logger.warning("⚠️ No profiles found in search, cannot proceed with extraction")
-            return search_results, None
+        # Submit job to ARQ
+        logger.info("Submitting job to ARQ worker")
+        arq_job = await arq_pool.enqueue_job(
+            'process_job',
+            job_id=job_id,
+            job_description=job_description,
+            search_method=search_method,
+            limit=limit,
+            cache_key=cache_key
+        )
         
-        # Step 2: Extract profile data
-        profiles_to_extract = search_results.profiles
-        if max_extractions and max_extractions < len(profiles_to_extract):
-            profiles_to_extract = profiles_to_extract[:max_extractions]
-            logger.info(f"📊 Limiting extraction to first {max_extractions} profiles")
+        logger.info(f"Job {job_id} submitted to ARQ (ARQ job ID: {arq_job.job_id})")
         
-        extraction_results = await self.extract_profiles(profiles_to_extract, use_login)
+        return JobResponse(
+            job_id=job_id,
+            status="queued", 
+            message="Job queued successfully with ARQ (scalable async processing)",
+            estimated_completion_time=(datetime.now() + timedelta(minutes=5)).isoformat()
+        )
+            
+    except Exception as e:
+        logger.error(f"Error submitting job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
+
+
+
+
+@app.get("/api/jobs/{job_id}/results", response_model=SearchResults)
+async def get_job_results(job_id: str):
+    """Get the results of a completed job."""
+    try:
+        # Check job status first
+        status_data = RedisCache.get_job_status(job_id)
+        if not status_data:
+            raise HTTPException(status_code=404, detail="Job not found")
         
-        # Summary
-        total_time = time.time() - start_time
-        logger.info("\n" + "="*50)
-        logger.info("📊 LINKEDIN SOURCING COMPLETE")
-        logger.info("="*50)
-        logger.info(f"🔍 Search Results: {search_results.total_results} profiles found")
-        logger.info(f"📊 Extraction Results: {extraction_results.successful_extractions}/{extraction_results.total_profiles} profiles extracted")
-        logger.info(f"⏱️  Total Time: {total_time:.1f} seconds")
+        if status_data.get("status") != "completed":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Job is not completed yet. Current status: {status_data.get('status')}"
+            )
         
-        if extraction_results.errors:
-            logger.info(f"❌ Errors: {len(extraction_results.errors)}")
-            for error in extraction_results.errors[:3]:  # Show first 3 errors
-                logger.info(f"   - {error}")
-            if len(extraction_results.errors) > 3:
-                logger.info(f"   ... and {len(extraction_results.errors) - 3} more")
+        # Get results
+        results = RedisCache.get_job_results(job_id)
+        if not results:
+            raise HTTPException(status_code=404, detail="Job results not found")
         
-        return search_results, extraction_results
-    
-    def get_summary(self) -> dict:
-        """Get a summary of the current session."""
-        summary = {
-            "session_timestamp": datetime.now().isoformat(),
-            "search_completed": self.search_results is not None,
-            "extraction_completed": self.extraction_results is not None
+        return SearchResults(**results)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting job results: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get job results: {str(e)}")
+
+
+
+
+@app.get("/api/jobs")
+async def list_jobs(status: Optional[str] = None):
+    """List all jobs with optional status filtering. Returns candidates with URL and score only."""
+    try:
+        jobs = RedisCache.get_all_jobs(status)
+        
+        result = []
+        for job in jobs:
+            job_id = job.get("job_id")
+            job_status = job.get("status")
+            
+            job_data = {
+                "job_id": job_id,
+                "status": job_status,
+                "created_at": job.get("created_at"),
+                "completed_at": job.get("completed_at"),
+                "total_candidates": job.get("total_candidates", 0),
+                "passed_candidates": job.get("passed_candidates", 0),
+                "candidates": []
+            }
+            
+            # If job is completed, get candidate data
+            if job_status == "completed" and job_id:
+                results_data = RedisCache.get_job_results(job_id)
+                if results_data and "candidates" in results_data:
+                    for candidate in results_data["candidates"]:
+                        job_data["candidates"].append({
+                            "name": candidate.get("name", ""),
+                            "linkedin_url": candidate.get("linkedin_url", ""),
+                            "fit_score": candidate.get("fit_score", 0.0),
+                            "outreach_message": candidate.get("outreach_message", ""),
+                            "score_breakdown": candidate.get("score_breakdown", {}),
+                            "passed": candidate.get("passed", False)
+                        })
+            
+            result.append(job_data)
+        
+        return {
+            "total_jobs": len(result),
+            "status_filter": status,
+            "jobs": result
         }
         
-        if self.search_results:
-            summary["search_summary"] = {
-                "search_query": self.search_results.search_query,
-                "search_terms": self.search_results.search_terms,
-                "total_profiles_found": self.search_results.total_results,
-                "searched_at": self.search_results.searched_at.isoformat()
-            }
-        
-        if self.extraction_results:
-            summary["extraction_summary"] = {
-                "total_profiles": self.extraction_results.total_profiles,
-                "successful_extractions": self.extraction_results.successful_extractions,
-                "failed_extractions": self.extraction_results.failed_extractions,
-                "success_rate": f"{(self.extraction_results.successful_extractions / self.extraction_results.total_profiles * 100):.1f}%",
-                "total_time": f"{self.extraction_results.total_time:.1f}s",
-                "extracted_profiles": [
-                    {
-                        "name": profile.name,
-                        "headline": profile.headline,
-                        "location": profile.location,
-                        "linkedin_url": profile.linkedin_url,
-                        "experience_count": len(profile.experience) if profile.experience else 0,
-                        "education_count": len(profile.education) if profile.education else 0,
-                        "skills_count": len(profile.skills) if profile.skills else 0
-                    }
-                    for profile in self.extraction_results.profiles
-                ]
-            }
-        
-        return summary
+    except Exception as e:
+        logger.error(f"Error listing jobs: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list jobs: {str(e)}")
 
 
-async def search_only_mode(search_terms: List[str], max_results: int = MAX_PROFILES) -> SearchResult:
-    """
-    Safe mode: Only search for LinkedIn profile URLs without accessing LinkedIn directly.
-    """
-    logger.info("🛡️  SAFE MODE: Only extracting LinkedIn URLs from Google search")
-    logger.info("   This mode does NOT access LinkedIn directly - your account is safe!")
-    
-    sourcer = LinkedInSourcer()
-    return await sourcer.search_profiles(search_terms, max_results)
-
-
-async def extract_only_mode(profile_urls: List[str], use_login: bool = True) -> BatchExtractionResult:
-    """
-    Extract profiles from a provided list of URLs.
-    """
-    logger.info("📊 EXTRACTION MODE: Processing provided LinkedIn URLs")
-    
-    sourcer = LinkedInSourcer()
-    return await sourcer.extract_profiles(profile_urls, use_login)
-
-
-async def full_workflow_mode(search_terms: List[str], 
-                           max_search_results: int = MAX_PROFILES,
-                           max_extractions: int = None,
-                           use_login: bool = True) -> tuple[SearchResult, BatchExtractionResult]:
-    """
-    Complete workflow: Search + Extract profiles.
-    """
-    logger.info("🚀 FULL WORKFLOW MODE: Search + Extract LinkedIn profiles")
-    
-    sourcer = LinkedInSourcer()
-    return await sourcer.search_and_extract(
-        search_terms, 
-        max_search_results, 
-        max_extractions, 
-        use_login
-    )
-
-
-def parse_search_query(query_string: str) -> List[str]:
-    """Parse a search query string into individual terms."""
-    # Handle quoted terms and individual words
-    import re
-    
-    # Find quoted terms
-    quoted_terms = re.findall(r'"([^"]*)"', query_string)
-    
-    # Remove quoted terms from string and split remaining words
-    remaining = re.sub(r'"[^"]*"', '', query_string)
-    individual_words = [word.strip() for word in remaining.split() if word.strip()]
-    
-    # Combine quoted terms and individual words
-    all_terms = quoted_terms + individual_words
-    
-    # Filter out common words and site restrictions
-    filtered_terms = [
-        term for term in all_terms 
-        if term and not term.startswith('site:') and term.lower() not in ['and', 'or', 'the', 'a', 'an']
-    ]
-    
-    return filtered_terms
-
-
-async def interactive_mode():
-    """Interactive mode for user input."""
-    print("\n" + "="*60)
-    print("🔍 LINKEDIN PROFILE SOURCER - Interactive Mode")
-    print("="*60)
-    
+@app.delete("/api/jobs/{job_id}/cache")
+async def delete_job_cache(job_id: str):
+    """Delete cache entries for a specific job."""
     try:
-        validate_config()
-    except ValueError as e:
-        print(f"❌ Configuration Error: {e}")
-        print("\n💡 Please check your .env file and ensure all required variables are set.")
-        return
-    
-    print("\nChoose your mode:")
-    print("1. 🛡️  Search Only (Safe - No LinkedIn login required)")
-    print("2. 📊 Extract Only (Provide URLs)")
-    print("3. 🚀 Full Workflow (Search + Extract)")
-    print("4. ❌ Exit")
-    
-    while True:
-        choice = input("\nEnter your choice (1-4): ").strip()
+        deleted = RedisCache.delete_job_cache(job_id)
+        if deleted:
+            return {
+                "message": f"Cache deleted for job {job_id}",
+                "job_id": job_id,
+                "deleted": True
+            }
+        else:
+            return {
+                "message": f"No cache found for job {job_id}",
+                "job_id": job_id,
+                "deleted": False
+            }
+    except Exception as e:
+        logger.error(f"Error deleting job cache: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete job cache: {str(e)}")
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    try:
+        redis_status = "connected" if RedisCache.is_available() else "unavailable"
         
-        if choice == "1":
-            # Search only mode
-            search_input = input(f"\nEnter search terms (default: {DEFAULT_SEARCH_QUERY}): ").strip()
-            if not search_input:
-                search_input = DEFAULT_SEARCH_QUERY
-            
-            search_terms = parse_search_query(search_input)
-            max_results = int(input(f"Max results (default: {MAX_PROFILES}): ") or MAX_PROFILES)
-            
-            print(f"\n🔍 Searching for: {search_terms}")
-            print(f"📊 Max results: {max_results}")
-            
-            result = await search_only_mode(search_terms, max_results)
-            
-            print(f"\n✅ Found {result.total_results} LinkedIn profiles:")
-            for i, url in enumerate(result.profiles[:10], 1):  # Show first 10
-                print(f"  {i}. {url}")
-            if len(result.profiles) > 10:
-                print(f"  ... and {len(result.profiles) - 10} more")
-            
-            break
-            
-        elif choice == "2":
-            # Extract only mode
-            print("\nEnter LinkedIn profile URLs (one per line, empty line to finish):")
-            urls = []
-            while True:
-                url = input().strip()
-                if not url:
-                    break
-                if "linkedin.com/in/" in url:
-                    urls.append(url)
-                else:
-                    print("⚠️  Invalid LinkedIn URL, skipping...")
-            
-            if not urls:
-                print("❌ No valid URLs provided")
-                continue
-            
-            use_login = input("Use LinkedIn login for authenticated access? (y/N): ").strip().lower() == 'y'
-            
-            print(f"\n📊 Extracting {len(urls)} profiles...")
-            result = await extract_only_mode(urls, use_login)
-            
-            print(f"\n✅ Extraction completed:")
-            print(f"   Success: {result.successful_extractions}/{result.total_profiles}")
-            print(f"   Time: {result.total_time:.1f}s")
-            
-            break
-            
-        elif choice == "3":
-            # Full workflow mode
-            search_input = input(f"\nEnter search terms (default: {DEFAULT_SEARCH_QUERY}): ").strip()
-            if not search_input:
-                search_input = DEFAULT_SEARCH_QUERY
-            
-            search_terms = parse_search_query(search_input)
-            max_search = int(input(f"Max search results (default: {MAX_PROFILES}): ") or MAX_PROFILES)
-            max_extract = input(f"Max extractions (default: all found): ").strip()
-            max_extract = int(max_extract) if max_extract else None
-            
-            use_login = input("Use LinkedIn login for authenticated access? (y/N): ").strip().lower() == 'y'
-            
-            print(f"\n🚀 Starting full workflow:")
-            print(f"   Search terms: {search_terms}")
-            print(f"   Max search results: {max_search}")
-            print(f"   Max extractions: {max_extract or 'all'}")
-            print(f"   Use login: {use_login}")
-            
-            search_result, extract_result = await full_workflow_mode(
-                search_terms, max_search, max_extract, use_login
-            )
-            
-            # Show summary
-            sourcer = LinkedInSourcer()
-            sourcer.search_results = search_result
-            sourcer.extraction_results = extract_result
-            summary = sourcer.get_summary()
-            
-            print(f"\n📋 Session Summary:")
-            print(json.dumps(summary, indent=2, default=str))
-            
-            break
-            
-        elif choice == "4":
-            print("👋 Goodbye!")
-            break
-            
-        else:
-            print("❌ Invalid choice, please try again.")
+        # Check ARQ pool
+        arq_status = "healthy"
+        try:
+            if arq_pool:
+                await arq_pool.ping()
+            else:
+                arq_status = "pool not initialized"
+        except Exception as e:
+            arq_status = f"unhealthy: {str(e)}"
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "redis": redis_status,
+            "arq_system": {
+                "status": arq_status,
+                "features": ["async_processing", "scalability", "distributed_workers"]
+            },
+            "features": {
+                "async_processing": "True async with ARQ",
+                "concurrent_jobs": "Up to 10 jobs concurrently",
+                "search_methods": ["rapid_api", "playwright"],
+                "pipeline_features": ["search", "extraction", "scoring", "outreach"]
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)
+        }
 
 
-async def main():
-    """Main entry point."""
-    import sys
-    
-    if len(sys.argv) > 1:
-        # Command line mode
-        if sys.argv[1] == "search":
-            # python main.py search "backend engineer" "fintech" "San Francisco"
-            search_terms = sys.argv[2:] if len(sys.argv) > 2 else parse_search_query(DEFAULT_SEARCH_QUERY)
-            result = await search_only_mode(search_terms)
-            
-            print(f"Found {result.total_results} profiles:")
-            for url in result.profiles:
-                print(url)
-                
-        elif sys.argv[1] == "extract":
-            # python main.py extract https://linkedin.com/in/profile1 https://linkedin.com/in/profile2
-            urls = sys.argv[2:]
-            if not urls:
-                print("❌ No URLs provided")
-                return
-            
-            result = await extract_only_mode(urls)
-            print(f"Extracted {result.successful_extractions}/{result.total_profiles} profiles")
-            
-        elif sys.argv[1] == "workflow":
-            # python main.py workflow "backend engineer" "fintech" "San Francisco"
-            search_terms = sys.argv[2:] if len(sys.argv) > 2 else parse_search_query(DEFAULT_SEARCH_QUERY)
-            search_result, extract_result = await full_workflow_mode(search_terms)
-            
-            print(f"Search: {search_result.total_results} profiles found")
-            print(f"Extract: {extract_result.successful_extractions}/{extract_result.total_profiles} profiles extracted")
-            
-        else:
-            print("❌ Unknown command. Use: search, extract, or workflow")
-    else:
-        # Interactive mode
-        await interactive_mode()
+
+@app.get("/")
+async def root():
+    """Root endpoint redirect to API info."""
+    return {
+        "message": "LinkedIn Profile Sourcing API",
+        "docs": "/docs",
+        "api": "/api"
+    }
+
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    print("🌐 Starting LinkedIn Sourcing API...")
+    print("   API will be available at: http://localhost:8000")
+    print("   API docs at: http://localhost:8000/docs")
+    print("   Health check: http://localhost:8000/api/health")
+    print("   Press Ctrl+C to stop")
+    
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True) 

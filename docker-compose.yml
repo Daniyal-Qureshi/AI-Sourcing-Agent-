@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: python worker.py
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./output:/app/output
+
+  api:
+    build: .
+    command: python main.py
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - worker
+    restart: unless-stopped
+    volumes:
+      - ./output:/app/output
+
+volumes:
+  redis_data: 

@@ -11,7 +11,7 @@ openai==1.93.0
 pydantic==2.9.2
 
 # Environment Variables
-python-dotenv==1.0.1
+python-dotenv==1.0.0
 
 # Data Processing
 pandas==2.2.3
@@ -22,8 +22,19 @@ aiohttp==3.10.5
 
 # Utilities
 typing-extensions==4.12.2
-urllib3==2.2.3
+urllib3==1.26.18
 
 # Development and Testing
 pytest==8.3.3
-pytest-asyncio==0.24.0 
+pytest-asyncio==0.24.0
+
+# Additional dependencies for enhanced features
+requests==2.32.3
+
+# FastAPI and API dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+redis==5.0.1
+arq==0.26.3
+httpx==0.25.2
+python-multipart==0.0.6 
