@@ -827,7 +827,22 @@ class IntegratedLinkedInExtractor:
                     print(f"\n🤖 AI INSIGHTS FROM README:")
                     for key, value in ai_insights.items():
                         if isinstance(value, list) and value:
-                            print(f"   {key.title()}: {', '.join(value[:5])}")
+                            # Handle list of strings vs list of dictionaries
+                            if isinstance(value[0], dict):
+                                # For dictionaries, extract meaningful info
+                                items = []
+                                for item in value[:3]:  # Show top 3 items
+                                    if isinstance(item, dict):
+                                        # Extract name/title or first meaningful value
+                                        name = item.get('name') or item.get('title') or str(list(item.values())[0] if item.values() else 'Unknown')
+                                        items.append(name)
+                                    else:
+                                        items.append(str(item))
+                                print(f"   {key.title()}: {', '.join(items)}")
+                            else:
+                                # For list of strings, join normally
+                                string_items = [str(item) for item in value[:5]]
+                                print(f"   {key.title()}: {', '.join(string_items)}")
                         elif isinstance(value, str) and value:
                             print(f"   {key.title()}: {value[:100]}...")
                         elif value:

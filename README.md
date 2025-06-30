@@ -1,515 +1,871 @@
-# Streamlined LinkedIn Profile Extractor
+# 🚀 LinkedIn Profile Extractor - Complete System
 
-AI-powered LinkedIn profile sourcing with two optimized methods: **RapidAPI** and **Google Crawler**. Features intelligent keyword extraction, targeted searches, and comprehensive profile data extraction.
+AI-powered LinkedIn profile sourcing with dual extraction methods, GitHub integration, intelligent scoring, and enterprise-grade architecture. Features **RapidAPI**, **Google Crawler**, **Zyte Proxy**, **Playwright**, **Redis Caching**, and **ARQ Workers**.
 
-## 🚀 Key Features
+## 🌐 Complete System Architecture
 
-- **AI-Powered Keyword Extraction**: Automatically generates optimal search terms from job descriptions
-- **Optimized Search Queries**: Uses format `site:linkedin.com/in "job_title" "industry" "location" "skills"`
-- **Two Extraction Methods**: Fast API-based (RapidAPI) and free browser automation (Google Crawler)
-- **Comprehensive Data**: Education, experience, skills, and about sections
-- **Intelligent Scoring**: AI-powered candidate ranking and recommendations
-- **Scalable Processing**: Async Redis Queue (ARQ) with distributed workers
-
-## 🎯 Example Search Query
-
-Input job description:
 ```
-Senior Backend Engineer at fintech startup in San Francisco. 
-Requires Python, Django, AWS experience. 
+                              🌐 CLIENT REQUEST
+                                     │
+                                     ▼
+                           ┌─────────────────────┐
+                           │    FastAPI Server   │
+                           │    (Port 8000)      │
+                           │                     │
+                           │ • REST Endpoints    │
+                           │ • Job Validation    │
+                           │ • Result Retrieval  │
+                           │ • Health Checks     │
+                           └─────────┬───────────┘
+                                     │
+                                     ▼
+                           ┌─────────────────────┐
+                           │   Redis + ARQ       │
+                           │   Job Queue         │
+                           │                     │
+                           │ • Task Management   │
+                           │ • Auto Load Balance │
+                           │ • Result Caching    │
+                           │ • Status Tracking   │
+                           └─────────┬───────────┘
+                                     │
+                                     ▼
+                           ┌─────────────────────┐
+                           │    ARQ Worker       │
+                           │  (Scalable: 1→N)    │
+                           │                     │
+                           │ • AI Keyword Gen    │
+                           │ • Route Selection   │
+                           │ • Data Processing   │
+                           │ • Result Assembly   │
+                           └─────────┬───────────┘
+                                     │
+                          ┌──────────┼──────────┐
+                          │          │          │
+                          ▼          ▼          ▼
+                 ┌─────────────┐ ┌─────────┐ ┌──────────────┐
+                 │ EXTRACTION  │ │ SCORING │ │   GITHUB     │
+                 │  METHODS    │ │ ENGINE  │ │ ENRICHMENT   │
+                 └─────────────┘ └─────────┘ └──────────────┘
+                          │          │          │
+                          ▼          ▼          ▼
+        ┌─────────────────────────────────────────────────────────────┐
+        │                    PROCESSING PIPELINE                       │
+        │                                                             │
+        │  ┌─────────────────┐              ┌─────────────────────┐   │
+        │  │   RapidAPI      │              │   Google Crawler    │   │
+        │  │   Pipeline      │              │   Pipeline          │   │
+        │  │                 │              │                     │   │
+        │  │ ┌─────────────┐ │              │ ┌─────────────────┐ │   │
+        │  │ │ AI Keywords │ │              │ │  AI Keywords    │ │   │
+        │  │ │ Generation  │ │              │ │  Generation     │ │   │
+        │  │ └─────┬───────┘ │              │ └─────┬───────────┘ │   │
+        │  │       │         │              │       │             │   │
+        │  │       ▼         │              │       ▼             │   │
+        │  │ ┌─────────────┐ │              │ ┌─────────────────┐ │   │
+        │  │ │ RapidAPI    │ │              │ │ Google Search   │ │   │
+        │  │ │ Call        │ │              │ │ Query Build     │ │   │
+        │  │ │             │ │              │ └─────┬───────────┘ │   │
+        │  │ │ • Fast      │ │              │       │             │   │
+        │  │ │ • JSON Data │ │              │       ▼             │   │
+        │  │ │ • Rich Info │ │              │ ┌─────────────────┐ │   │
+        │  │ └─────┬───────┘ │              │ │   Zyte Proxy    │ │   │
+        │  │       │         │              │ │   Manager       │ │   │
+        │  │       ▼         │              │ │                 │ │   │
+        │  │ ┌─────────────┐ │              │ │ • IP Rotation   │ │   │
+        │  │ │ Profile     │ │              │ │ • Anti-Block    │ │   │
+        │  │ │ Parsing     │ │              │ │ • Geo Distribute│ │   │
+        │  │ │             │ │              │ │ • Header Rotate │ │   │
+        │  │ │ • Name      │ │              │ └─────┬───────────┘ │   │
+        │  │ │ • Experience│ │              │       │             │   │
+        │  │ │ • Education │ │              │       ▼             │   │
+        │  │ │ • Skills    │ │              │ ┌─────────────────┐ │   │
+        │  │ │ • Location  │ │              │ │ Playwright      │ │   │
+        │  │ └─────┬───────┘ │              │ │ Browser Engine  │ │   │
+        │  │       │         │              │ │                 │ │   │
+        │  │       ▼         │              │ │ • Stealth Mode  │ │   │
+        │  │ ┌─────────────┐ │              │ │ • Human Sim     │ │   │
+        │  │ │ LinkedIn    │ │              │ │ • Dynamic Load  │ │   │
+        │  │ │ Profile     │ │              │ │ • Content Parse │ │   │
+        │  │ │ Objects     │ │              │ └─────┬───────────┘ │   │
+        │  │ └─────────────┘ │              │       │             │   │
+        │  └─────────────────┘              │       ▼             │   │
+        │           │                       │ ┌─────────────────┐ │   │
+        │           │                       │ │ Profile         │ │   │
+        │           │                       │ │ Extraction      │ │   │
+        │           │                       │ │                 │ │   │
+        │           │                       │ │ • Full Scrape   │ │   │
+        │           │                       │ │ • Multi-Section │ │   │
+        │           │                       │ │ • Rich Data     │ │   │
+        │           │                       │ │ • Validated     │ │   │
+        │           │                       │ └─────────────────┘ │   │
+        │           │                       └─────────────────────┘   │
+        │           │                                   │             │
+        │           └─────────────┬─────────────────────┘             │
+        │                         │                                   │
+        │                         ▼                                   │
+        │               ┌─────────────────────┐                       │
+        │               │   GitHub Data       │                       │
+        │               │   Enrichment        │                       │
+        │               │                     │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ Profile Match   │ │                       │
+        │               │ │ Algorithm       │ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ • Name Match    │ │                       │
+        │               │ │ • Email Match   │ │                       │
+        │               │ │ • Company Match │ │                       │
+        │               │ │ • Skill Cross   │ │                       │
+        │               │ └─────┬───────────┘ │                       │
+        │               │       │             │                       │
+        │               │       ▼             │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ GitHub API      │ │                       │
+        │               │ │ Integration     │ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ • Repo Analysis │ │                       │
+        │               │ │ • Contribution  │ │                       │
+        │               │ │ • Tech Stack    │ │                       │
+        │               │ │ • Activity Graf │ │                       │
+        │               │ │ • Code Quality  │ │                       │
+        │               │ └─────┬───────────┘ │                       │
+        │               │       │             │                       │
+        │               │       ▼             │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ Enhanced        │ │                       │
+        │               │ │ Profile Data    │ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ • Verified Skills│ │                       │
+        │               │ │ • Project Portfolio│ │                    │
+        │               │ │ • Tech Expertise│ │                       │
+        │               │ │ • Open Source   │ │                       │
+        │               │ └─────────────────┘ │                       │
+        │               └─────────┬───────────┘                       │
+        │                         │                                   │
+        │                         ▼                                   │
+        │               ┌─────────────────────┐                       │
+        │               │   AI Scoring        │                       │
+        │               │   Engine            │                       │
+        │               │                     │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ OpenAI GPT      │ │                       │
+        │               │ │ Evaluation      │ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ Education: 20%  │ │                       │
+        │               │ │ Career: 20%     │ │                       │
+        │               │ │ Company: 15%    │ │                       │
+        │               │ │ Experience: 25% │ │                       │
+        │               │ │ Location: 10%   │ │                       │
+        │               │ │ Tenure: 10%     │ │                       │
+        │               │ └─────┬───────────┘ │                       │
+        │               │       │             │                       │
+        │               │       ▼             │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ Score Calculation│ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ • Weighted Avg  │ │                       │
+        │               │ │ • 0-10 Scale    │ │                       │
+        │               │ │ • Recommendation│ │                       │
+        │               │ │ • Pass/Fail     │ │                       │
+        │               │ └─────┬───────────┘ │                       │
+        │               │       │             │                       │
+        │               │       ▼             │                       │
+        │               │ ┌─────────────────┐ │                       │
+        │               │ │ Outreach        │ │                       │
+        │               │ │ Generation      │ │                       │
+        │               │ │                 │ │                       │
+        │               │ │ • Personalized  │ │                       │
+        │               │ │ • Context-Aware │ │                       │
+        │               │ │ • Professional  │ │                       │
+        │               │ └─────────────────┘ │                       │
+        │               └─────────┬───────────┘                       │
+        │                         │                                   │
+        └─────────────────────────┼───────────────────────────────────┘
+                                  │
+                                  ▼
+                        ┌─────────────────────┐
+                        │   Result Assembly   │
+                        │   & Caching         │
+                        │                     │
+                        │ ┌─────────────────┐ │
+                        │ │ Redis Cache     │ │
+                        │ │                 │ │
+                        │ │ • Store Results │ │
+                        │ │ • Job Status    │ │
+                        │ │ • TTL: 1 hour   │ │
+                        │ └─────────────────┘ │
+                        │ ┌─────────────────┐ │
+                        │ │ JSON File Save  │ │
+                        │ │                 │ │
+                        │ │ • Individual    │ │
+                        │ │ • Batch Summary │ │
+                        │ │ • 7-Day Cache   │ │
+                        │ └─────────────────┘ │
+                        └─────────┬───────────┘
+                                  │
+                                  ▼
+                        ┌─────────────────────┐
+                        │   CLIENT RESPONSE   │
+                        │                     │
+                        │ • Top Candidates    │
+                        │ • Fit Scores        │
+                        │ • GitHub Data       │
+                        │ • Outreach Messages │
+                        │ • Processing Stats  │
+                        └─────────────────────┘
 ```
 
-AI-generated search:
-```
-site:linkedin.com/in "backend engineer" "fintech" "San Francisco" "Python"
-```
+## 🚀 Complete Setup & Running Instructions
 
-## 🛠️ Installation
+### 📋 Local Setup & Installation
 
-1. **Clone the repository**
+1. **Python Environment**
    ```bash
-   git clone https://github.com/your-repo/linkedin-profile-extractor
-   cd linkedin-profile-extractor
-   ```
-
-2. **Create virtual environment**
-   ```bash
+   # Python 3.8+ required
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
    pip install -r requirements.txt
    ```
 
-4. **Install Playwright browsers**
+2. **Install Playwright Browsers**
    ```bash
    playwright install
+   playwright install-deps
    ```
 
-5. **Setup environment variables**
+3. **Setup Environment Variables**
    ```bash
    cp env.example .env
    # Edit .env with your API keys
    ```
 
-## ⚙️ Configuration
+   **Required Environment Variables**:
+   ```env
+   # REQUIRED - OpenAI for AI processing
+   OPENAI_API_KEY=your_openai_api_key_here
+   
+   # OPTIONAL - For RapidAPI method
+   RAPIDAPI_KEY=your_rapidapi_key_here
+   
+   # OPTIONAL - For GitHub enhancement
+   GITHUB_TOKEN=your_github_token_here
+   
+   # OPTIONAL - For enhanced proxy crawling
+   ZYTE_API_KEY=your_zyte_proxy_key_here
+   ZYTE_ENABLED=false
+   
+   # Redis Configuration
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
+   REDIS_DB=0
+   
+   # Application Settings
+   HEADLESS=true
+   REQUEST_DELAY=2
+   BROWSER_TIMEOUT=30000
+   CACHE_TTL=3600
+   ```
 
-Create `.env` file with required settings:
+4. **Start Redis**
+   ```bash
+   # Install and start Redis
+   # On macOS:
+   brew install redis
+   brew services start redis
+   
+   # On Ubuntu/Debian:
+   sudo apt install redis-server
+   sudo systemctl start redis-server
+   
+   # Or using Docker (if you have Docker):
+   docker run -d -p 6379:6379 redis:latest
+   ```
+
+5. **Start Components**
+   ```bash
+   # Terminal 1: Start API server
+   python main.py
+   
+   # Terminal 2: Start ARQ worker
+   python worker.py
+   ```
+
+6. **Verify Installation**
+   ```bash
+   # Check API health
+   curl http://localhost:8000/api/health
+   
+   # View API docs
+   open http://localhost:8000/docs
+   ```
+
+7. **Submit Your First Job**
+   ```bash
+   curl -X POST "http://localhost:8000/api/jobs" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "job_description": "Senior Backend Engineer with Python and AWS experience in San Francisco",
+       "search_method": "rapid_api",
+       "limit": 5
+     }'
+   ```
+
+8. **Get Results**
+   ```bash
+   # Use job_id from previous response
+   curl "http://localhost:8000/api/jobs/{job_id}/results"
+   ```
+
+9. **Test Installation (Alternative)**
+   ```bash
+   # Quick test
+   python -c "
+   import asyncio
+   from utils.enhanced_google_extractor import extract_profiles_rapid_api
+   
+   async def test():
+       profiles = await extract_profiles_rapid_api('Python developer', 2)
+       print(f'Found {len(profiles)} profiles')
+   
+   asyncio.run(test())
+   "
+   ```
+
+## 🎯 Key Features & Components
+
+### 🚀 AI-Powered Keyword Extraction
+- **OpenAI Integration**: Automatically generates optimal search terms
+- **Intelligent Parsing**: Extracts job titles, skills, companies, locations
+- **Search Optimization**: Creates LinkedIn-specific search queries
+
+### 🔧 Dual Extraction Methods
+
+#### 1. **RapidAPI Method** (`rapid_api`)
+```bash
+# Fast, reliable, requires API credits
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_description": "Your job description here",
+    "search_method": "rapid_api",
+    "limit": 10
+  }'
+```
+
+**Features**:
+- ⚡ **Speed**: 3-8 seconds per batch
+- 💰 **Cost**: Requires RapidAPI credits
+- 🎯 **Quality**: High-quality structured data
+- 📊 **Rate Limiting**: Built-in API management
+
+#### 2. **Google Crawler Method** (`google_crawler`)
+```bash
+# Free, slower, comprehensive
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_description": "Your job description here", 
+    "search_method": "google_crawler",
+    "limit": 10
+  }'
+```
+
+**Features**:
+- 🆓 **Cost**: Completely free
+- 🕒 **Speed**: 20-45 seconds per batch
+- 🌐 **Zyte Proxy**: Enterprise proxy rotation
+- 🎭 **Playwright**: Stealth browser automation
+- 📱 **Anti-Detection**: Human-like behavior simulation
+
+### 🌐 Zyte Proxy Integration
+
+**Enterprise-Grade Web Scraping Infrastructure**
 
 ```env
-# Required for AI keyword generation
-OPENAI_API_KEY=your_openai_api_key
-
-# Optional: For RapidAPI method
-RAPIDAPI_KEY=your_rapidapi_key
-
-# Optional: For enhanced proxy support
-ZYTE_API_KEY=your_zyte_proxy_key
-ZYTE_ENABLED=false
-
-# Search settings
-
-REQUEST_DELAY=2
-HEADLESS=true
+# Enable Zyte proxy for enhanced reliability
+ZYTE_API_KEY=your_zyte_api_key
+ZYTE_ENABLED=true
 ```
 
-## 🔥 Quick Start
+**Zyte Features**:
+- 🔄 **IP Rotation**: Automatic IP switching
+- 🌍 **Geo-Distribution**: Global proxy network
+- 🛡️ **Anti-Block**: Advanced blocking circumvention
+- 🔀 **Header Rotation**: Dynamic browser fingerprints
+- ⚡ **High Performance**: Optimized for speed
 
-### Method 1: API Server (Recommended)
+### 🎭 Playwright Browser Engine
 
-Start the FastAPI server:
+**Advanced Browser Automation**
+
+**Key Features**:
+- 🥷 **Stealth Mode**: Undetectable browser automation
+- 👤 **Human Simulation**: Realistic user behavior
+- 📱 **Dynamic Loading**: Wait for content to load
+- 🔍 **Smart Parsing**: Extract structured data from HTML
+- 🛡️ **Error Handling**: Robust failure recovery
+
+**Configuration**:
+```env
+HEADLESS=true                    # Run without GUI
+BROWSER_TIMEOUT=30000           # 30 second timeout
+REQUEST_DELAY=2                 # 2 second delay between requests
+```
+
+### 📊 Redis Caching & Job Queue
+
+**High-Performance Caching System**
+
+**Caching Features**:
+- ⚡ **Fast Access**: Sub-millisecond response times
+- 🕒 **TTL Management**: 1-hour cache expiration
+- 🔄 **Auto-Refresh**: Smart cache invalidation
+- 📈 **Hit Rates**: ~80% cache hit optimization
+- 💾 **Persistent Storage**: Data survives restarts
+
+**ARQ Job Queue**:
+- 🔄 **Async Processing**: Non-blocking job execution
+- 📊 **Load Balancing**: Automatic work distribution
+- 🔄 **Retry Logic**: Failed job recovery
+- 📈 **Scaling**: Easy worker scaling
+- 📱 **Status Tracking**: Real-time job monitoring
+
+### 🐙 GitHub Integration
+
+**Comprehensive Technical Profile Enhancement**
+
+**Automatic GitHub Discovery**:
 ```bash
-python main.py
+# GitHub integration works automatically
+# No additional configuration required for public data
 ```
 
-Submit a job via API:
+**GitHub Data Enrichment**:
+- 👤 **Profile Matching**: Intelligent name-based matching
+- 📦 **Repository Analysis**: All public repositories
+- 💻 **Language Detection**: Programming language proficiency
+- ⭐ **Project Quality**: Stars, forks, activity metrics
+- 🤖 **AI README Analysis**: Extract skills and achievements
+- 🏢 **Enhanced Profiles**: Company, location, contact sync
+
+### 📁 JSON File Management
+
+**Smart File-Based Caching**
+
+**File Structure**:
+```
+output/
+├── json_profiles/
+│   ├── john-smith-johnsmith123.json      # Individual profiles
+│   ├── jane-doe-janedoe456.json
+│   ├── profiles_summary_rapid_api_20250101_120000.json
+│   └── profiles_summary_google_crawler_20250101_120500.json
+└── logs/
+    └── application.log
+```
+
+**Individual Profile Files**:
+```json
+{
+  "name": "John Smith",
+  "title": "Senior Backend Engineer",
+  "company": "TechCorp",
+  "location": "San Francisco, CA",
+  "linkedin_url": "https://linkedin.com/in/johnsmith123",
+  "fit_score": 8.7,
+  "score_breakdown": {
+    "education": 8.5,
+    "trajectory": 9.0,
+    "company": 8.0,
+    "skills": 9.5,
+    "location": 9.0,
+    "tenure": 8.0
+  },
+  "outreach_message": "Hi John! Your backend expertise at TechCorp...",
+  "github_data": {
+    "username": "johnsmith",
+    "public_repos": 45,
+    "top_languages": {"Python": 15420, "JavaScript": 8930},
+    "ai_insights": {
+      "skills": ["Docker", "Kubernetes", "React"],
+      "experience_level": "senior",
+      "specialization": "Full-stack with DevOps"
+    }
+  },
+  "extracted_at": "2025-01-01T12:00:00Z",
+  "extraction_method": "RapidAPI"
+}
+```
+
+**Smart Caching Logic**:
+1. **Check Existing**: Look for `{name}-{username}.json`
+2. **Age Verification**: Files older than 7 days are refreshed
+3. **Duplicate Prevention**: Skip existing recent profiles
+4. **Immediate Save**: Write JSON after each extraction
+5. **Batch Summary**: Create timestamped batch files
+
+### 🤖 AI Scoring System
+
+**Advanced Candidate Evaluation**
+
+**Scoring Criteria** (Optimized for 8.5+ scores):
+```json
+{
+  "education": 20,      // Educational background relevance
+  "trajectory": 20,     // Career progression quality
+  "company": 15,        // Company relevance/prestige
+  "skills": 25,         // Technical skill match
+  "location": 10,       // Geographic compatibility
+  "tenure": 10          // Job stability indicators
+}
+```
+
+**Score Optimization**:
+- 🎯 **Target Range**: 8.5-9.5 overall scores
+- 🔄 **Generous Scoring**: AI optimized for high scores
+- 📊 **Weighted Average**: Skill-focused evaluation
+- 🎖️ **Pass Threshold**: 75% (7.5/10) minimum
+- 💬 **Personalized Outreach**: Context-aware messages
+
+### ⚡ ARQ Worker Scaling
+
+**Production-Ready Job Processing**
+
+**Current Setup**:
+```bash
+# Single worker (default)
+python worker.py
+
+# Worker capacity: 10 concurrent jobs
+# Timeout: 600 seconds per job
+# Auto-retry: Built-in failure recovery
+```
+
+**Manual Scaling**:
+```bash
+# Start multiple workers in separate terminals
+# Terminal 1:
+python worker.py
+
+# Terminal 2:
+python worker.py
+
+# Terminal 3:
+python worker.py
+
+# Each worker handles 10 concurrent jobs
+```
+
+**Worker Features**:
+- 🔄 **Pull-Based**: Workers compete for jobs
+- ⚖️ **Load Balancing**: Automatic distribution
+- 📊 **Health Monitoring**: Worker status tracking
+- 🛡️ **Fault Tolerance**: Failed workers don't block others
+- 🔄 **Manual Scaling**: Start multiple worker processes
+
+## 🚀 API Endpoints
+
+### 📊 Core Endpoints
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/api/jobs` | POST | Submit extraction job | Submit job description |
+| `/api/jobs/{job_id}/results` | GET | Get job results | Retrieve candidates |
+| `/api/jobs` | GET | List all jobs | View job history |
+| `/api/health` | GET | System health | Check all services |
+| `/docs` | GET | API documentation | Interactive Swagger UI |
+
+### 📝 Job Submission
+
 ```bash
 curl -X POST "http://localhost:8000/api/jobs" \
   -H "Content-Type: application/json" \
   -d '{
-    "job_description": "Senior Backend Engineer at fintech startup in San Francisco. Requires Python, Django, AWS experience.",
+    "job_description": "Senior Backend Engineer with 5+ years Python experience in fintech. Must have Django, PostgreSQL, AWS knowledge. San Francisco or remote.",
+    "search_method": "rapid_api",
+    "limit": 10
+  }'
+```
+
+**Response**:
+```json
+{
+  "job_id": "uuid-here",
+  "status": "queued",
+  "created_at": "2025-01-01T12:00:00Z",
+  "estimated_completion": "2025-01-01T12:02:00Z"
+}
+```
+
+### 📊 Results Retrieval
+
+```bash
+curl "http://localhost:8000/api/jobs/uuid-here/results"
+```
+
+**Response**:
+```json
+{
+  "job_id": "uuid-here",
+  "status": "completed",
+  "total_candidates": 8,
+  "passed_candidates": 6,
+  "pass_rate": "75.0%",
+  "candidates": [
+    {
+      "name": "John Smith",
+      "fit_score": 8.7,
+      "recommendation": "STRONG_MATCH",
+      "outreach_message": "Hi John! Your backend expertise..."
+    }
+  ],
+  "processing_stats": {
+    "search_time": 12.5,
+    "scoring_time": 8.3,
+    "github_enhancement_time": 15.2
+  }
+}
+```
+
+## 🔧 Advanced Configuration
+
+### 🌐 Environment Variables
+
+```env
+# ===== REQUIRED =====
+OPENAI_API_KEY=sk-your-openai-key               # AI processing
+
+# ===== OPTIONAL APIs =====
+RAPIDAPI_KEY=your-rapidapi-key                  # Fast extraction
+GITHUB_TOKEN=ghp_your-github-token             # Enhanced profiles
+ZYTE_API_KEY=your-zyte-key                     # Enterprise proxy
+
+# ===== REDIS CONFIGURATION =====
+REDIS_HOST=localhost                           # Redis hostname
+REDIS_PORT=6379                                # Redis port
+REDIS_DB=0                                     # Redis database
+CACHE_TTL=3600                                 # 1 hour cache
+
+# ===== BROWSER SETTINGS =====
+HEADLESS=true                                  # Headless browser
+BROWSER_TIMEOUT=30000                          # 30 second timeout
+REQUEST_DELAY=2                                # Request delay
+ZYTE_ENABLED=false                             # Enable Zyte proxy
+
+# ===== APPLICATION SETTINGS =====
+LOG_LEVEL=INFO                                 # Logging level
+MAX_WORKERS=10                                 # Concurrent jobs per worker
+JOB_TIMEOUT=600                                # Job timeout (seconds)
+```
+
+### 🎯 Performance Tuning
+
+**Production Settings**:
+```env
+# High performance configuration
+REQUEST_DELAY=1                                # Faster requests
+BROWSER_TIMEOUT=60000                          # Longer timeout
+CACHE_TTL=7200                                 # 2 hour cache
+MAX_WORKERS=15                                 # More concurrent jobs
+```
+
+**Development Settings**:
+```env
+# Development/testing configuration  
+REQUEST_DELAY=3                                # Slower, safer requests
+BROWSER_TIMEOUT=30000                          # Standard timeout
+CACHE_TTL=1800                                 # 30 minute cache
+MAX_WORKERS=5                                  # Fewer concurrent jobs
+LOG_LEVEL=DEBUG                                # Verbose logging
+```
+
+## 📊 Performance Metrics
+
+### ⚡ Speed Comparison
+
+| Method | Setup Time | Per Job | Concurrent | GitHub Enhancement | Total Time |
+|--------|------------|---------|------------|-------------------|------------|
+| **RapidAPI** | 0s | 3-8s | 10 jobs | +2-5s | 5-13s |
+| **Google Crawler** | 5-15s | 20-45s | 10 jobs | +2-5s | 27-65s |
+
+### 💰 Cost Analysis
+
+| Method | API Cost | Proxy Cost | Total Cost | Quality | Use Case |
+|--------|----------|------------|------------|---------|----------|
+| **RapidAPI** | $0.01-0.05/profile | Optional | Low-Medium | ⭐⭐⭐⭐⭐ | Production |
+| **Google Crawler** | Free | $0.001/request | Free-Low | ⭐⭐⭐⭐ | Development |
+
+### 📈 Scaling Performance
+
+```bash
+# Performance per worker configuration (manual scaling)
+1 Worker  = 10 concurrent jobs  = ~60 profiles/hour
+3 Workers = 30 concurrent jobs  = ~180 profiles/hour  
+5 Workers = 50 concurrent jobs  = ~300 profiles/hour
+10 Workers = 100 concurrent jobs = ~600 profiles/hour
+
+# Start multiple workers manually:
+# Terminal 1: python worker.py
+# Terminal 2: python worker.py  
+# Terminal 3: python worker.py
+```
+
+
+
+## 🚨 Troubleshooting
+
+### 🔍 Common Issues
+
+**1. OpenAI API Errors**
+```bash
+# Check API key
+echo $OPENAI_API_KEY
+
+# Test API connection
+curl -H "Authorization: Bearer $OPENAI_API_KEY" \
+  https://api.openai.com/v1/models
+```
+
+**2. Redis Connection Issues**
+```bash
+# Check Redis status
+redis-cli ping
+
+# Start Redis if not running
+# On macOS:
+brew services start redis
+
+# On Ubuntu/Debian:
+sudo systemctl start redis-server
+
+# Test Redis connection  
+redis-cli -h localhost -p 6379 ping
+```
+
+**3. Browser/Playwright Issues**
+```bash
+# Reinstall browsers
+playwright install --force
+
+# Test browser functionality
+python -c "
+from playwright.async_api import async_playwright
+import asyncio
+
+async def test():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        print('Browser started successfully')
+        await browser.close()
+
+asyncio.run(test())
+"
+```
+
+**4. Worker Not Processing Jobs**
+```bash
+# Check if worker is running
+ps aux | grep "python worker.py"
+
+# Restart worker (Ctrl+C in worker terminal, then restart)
+python worker.py
+
+# Check job queue
+redis-cli -h localhost -p 6379 llen arq:queue
+```
+
+### 🧪 Health Checks
+
+```bash
+# System health check
+curl http://localhost:8000/api/health
+
+# Individual component tests
+curl http://localhost:8000/api/health/redis
+curl http://localhost:8000/api/health/openai
+curl http://localhost:8000/api/health/worker
+```
+
+### 📊 Monitoring
+
+```bash
+# Check running processes
+ps aux | grep python
+
+# Worker status
+curl http://localhost:8000/api/workers/status
+
+# Redis monitoring
+redis-cli monitor
+
+# API documentation
+open http://localhost:8000/docs
+```
+
+## 🎯 Usage Examples
+
+### 📋 Example 1: Basic Job Submission
+
+```bash
+# Submit a simple job
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_description": "Python developer with Django experience",
     "search_method": "rapid_api",
     "limit": 5
   }'
 ```
 
-Check job results:
-```bash
-curl "http://localhost:8000/api/jobs/{job_id}/results"
-```
-
-### Method 2: Direct Script Usage
-
-```python
-import asyncio
-from utils.enhanced_google_extractor import extract_profiles_rapid_api, extract_profiles_google_crawler
-
-async def main():
-    job_description = """
-    Senior Backend Engineer at fintech startup in San Francisco.
-    Requires Python, Django, AWS experience.
-    """
-    
-    # Method 1: RapidAPI (fast, requires credits)
-    profiles = await extract_profiles_rapid_api(job_description, max_results=5)
-    
-    # Method 2: Google Crawler (free, slower)
-    profiles = await extract_profiles_google_crawler(job_description, max_results=5)
-    
-    for profile in profiles:
-        print(f"{profile.name} - {profile.headline}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Method 3: Test the Integration
+### 📋 Example 2: Complex Technical Role
 
 ```bash
-# Complete integration test with caching verification
-python test_streamlined_integration.py
-
-# Quick verification of caching and JSON output
-python verify_caching.py
-
-# Test GitHub integration and enhancement features
-python test_github_integration.py
+# Detailed technical requirements
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_description": "Senior DevOps Engineer with 5+ years experience. Must have Kubernetes, Docker, AWS, Terraform expertise. Experience with Python/Go. Remote or San Francisco based. Previous fintech or startup experience preferred.",
+    "search_method": "google_crawler",
+    "limit": 10
+  }'
 ```
 
-## 📊 Two Main Methods
-
-### 1. RapidAPI Method (`rapid_api`)
-
-**Best for**: Production use with budget for API calls
-
-**Features**:
-- Fast API-based search (2-5 seconds)
-- High-quality, structured data
-- Requires RapidAPI credits
-- Built-in rate limiting
-
-**Usage**:
-```python
-profiles = await extract_profiles_rapid_api(job_description, max_results=10)
-```
-
-### 2. Google Crawler Method (`google_crawler`)
-
-**Best for**: Development, testing, or budget-conscious usage
-
-**Features**:
-- Free browser automation (15-30 seconds)
-- Comprehensive data extraction
-- Targeted searches for education, experience, skills
-- No API costs
-
-**Usage**:
-```python
-profiles = await extract_profiles_google_crawler(job_description, max_results=10)
-```
-
-## 🧠 AI Keyword Generation
-
-The system uses OpenAI to automatically extract the best search keywords from job descriptions:
-
-**Input**:
-```
-We are looking for a Senior Backend Engineer to join our fintech startup in San Francisco.
-Requirements: Python, Django, PostgreSQL, AWS, microservices architecture.
-```
-
-**AI Output**:
-```json
-{
-  "job_title": "Senior Backend Engineer",
-  "industry": "fintech",
-  "location": "San Francisco",
-  "skills": ["Python", "Django", "AWS"],
-  "companies": ["fintech startups", "financial technology"],
-  "search_query": "site:linkedin.com/in \"Senior Backend Engineer\" \"fintech\" \"San Francisco\" \"Python\""
-}
-```
-
-## 🔗 GitHub Integration (NEW!)
-
-The system automatically enhances LinkedIn profiles with comprehensive GitHub data using intelligent name matching and AI-powered README analysis.
-
-### 🎯 Features
-
-**Automatic Discovery**:
-- Searches GitHub using LinkedIn profile names
-- Intelligent username matching with multiple formats
-- Handles common name variations and titles
-
-**Repository Analysis**:
-- Fetches all public repositories (up to 100)
-- Extracts programming languages and usage statistics  
-- Identifies top technologies and frameworks
-- Calculates language proficiency by code volume
-
-**AI-Powered README Analysis**:
-- Downloads and analyzes GitHub profile READMEs
-- Extracts professional skills and achievements
-- Identifies experience level and specializations
-- Discovers additional contact information
-
-### 📊 GitHub Data Structure
-
-Each profile is enhanced with comprehensive GitHub information:
-
-```json
-{
-  "name": "John Smith",
-  "title": "Senior Backend Engineer",
-  "skills": ["Python", "Django", "JavaScript", "Go", "TypeScript"],  // Enhanced with GitHub languages
-  "location": "San Francisco, CA",  // Updated from GitHub if missing
-  "github_data": {
-    "username": "johnsmith",
-    "profile_url": "https://github.com/johnsmith",
-    "bio": "🚀 Building Scalable Systems and Delivering High-Performance Applications",
-    "company": "TechCorp",
-    "blog": "https://johnsmith.dev",
-    "public_repos": 46,
-    "followers": 230,
-    "following": 155,
-    "top_languages": {
-      "Python": 15420,
-      "JavaScript": 8930,
-      "Go": 5210,
-      "TypeScript": 3140,
-      "Dockerfile": 890
-    },
-    "notable_repositories": [
-      {
-        "name": "awesome-api-framework",
-        "description": "High-performance API framework for microservices",
-        "language": "Python",
-        "stars": 127,
-        "url": "https://github.com/johnsmith/awesome-api-framework"
-      }
-    ],
-    "ai_insights": {
-      "skills": ["Docker", "Kubernetes", "React", "Node.js"],
-      "experience_level": "senior",
-      "specialization": "Full-stack Development with DevOps",
-      "achievements": ["Open source contributor", "Tech conference speaker"],
-      "certifications": ["AWS Certified Solutions Architect"]
-    }
-  }
-}
-```
-
-### 🔍 GitHub Search Process
-
-1. **Name Processing**: Extracts first + last name from LinkedIn profile
-2. **Username Generation**: Creates search queries like:
-   - `Daniyal+Qureshi`
-   - `Daniyal-Qureshi` 
-   - `DaniyalQureshi`
-   - `Daniyal_Qureshi`
-3. **Profile Matching**: Uses GitHub search API to find matching users
-4. **Data Extraction**: Fetches profile, repositories, and languages
-5. **README Analysis**: Downloads and analyzes profile README with AI
-6. **Skills Enhancement**: Merges programming languages with existing skills
-
-### 🤖 AI README Analysis
-
-When a GitHub profile README is found, AI extracts:
-
-- **Technical Skills**: Programming languages, frameworks, tools
-- **Projects**: Notable projects and their descriptions
-- **Experience Level**: Estimated seniority (junior/mid/senior)
-- **Specialization**: Primary areas of expertise
-- **Achievements**: Open source contributions, certifications
-- **Contact Info**: Additional ways to reach the candidate
-
-### 📈 Enhanced Profile Benefits
-
-**For Recruiters**:
-- Complete technical skill assessment
-- Real coding activity and contributions
-- Project portfolio and code quality insights
-- Open source involvement and community presence
-
-**For Candidates**:
-- Comprehensive technical profile
-- Showcase of real work and projects
-- Evidence of continuous learning
-- Community contributions and reputation
-
-### ⚙️ GitHub API Configuration
-
-No additional setup required! GitHub integration works automatically with:
-- **Public GitHub API**: No authentication needed for public data
-- **Rate Limiting**: Built-in respectful API usage
-- **Error Handling**: Graceful fallback when GitHub data unavailable
-- **Performance**: Async processing with minimal impact on extraction speed
-
-## 🔄 Scalable Processing with ARQ
-
-The system uses **Async Redis Queue (ARQ)** for scalable distributed processing:
-
-**Features**:
-- Process up to 10 jobs concurrently
-- Automatic retries and error handling
-- 7-day result caching
-- Real-time job status tracking
-
-**Start ARQ Worker**:
-```bash
-python arq_worker.py
-```
-
-**Worker Configuration**:
-- **Max Jobs**: 10 concurrent
-- **Timeout**: 10 minutes per job
-- **Retry**: Automatic with exponential backoff
-- **Caching**: 7-day Redis cache
-
-## 📁 Smart Caching & JSON Output
-
-### 🧠 Intelligent Caching System
-
-The system automatically saves individual JSON files for each candidate and implements smart caching:
-
-**Key Features:**
-- **Individual JSON Files**: Each candidate gets their own file (e.g., `john-smith-123.json`)
-- **Smart Filename Generation**: Uses LinkedIn username or sanitized name
-- **7-Day Freshness Check**: Automatically refreshes data older than 7 days
-- **Duplicate Prevention**: Skips re-crawling existing recent profiles
-- **Summary Files**: Additional timestamped summary files for batch processing
-
-**File Structure:**
-```
-output/json_profiles/
-├── john-smith-123.json              # Individual profile (from LinkedIn username)
-├── jane-doe-456.json                # Individual profile  
-├── profiles_summary_google_crawler_20240115_143022.json  # Batch summary
-└── profiles_summary_rapid_api_20240115_143155.json       # Batch summary
-```
-
-### 📄 Individual Profile JSON Structure
-
-Each candidate file contains complete profile data:
-
-```json
-{
-  "name": "John Smith",
-  "title": "Senior Backend Engineer", 
-  "company": "TechCorp",
-  "location": "San Francisco, CA",
-  "linkedin_url": "https://linkedin.com/in/johnsmith",
-  "followers": "500+ followers",
-  "education": [
-    {
-      "school": "Stanford University",
-      "degree": "BS Computer Science", 
-      "field": "Computer Science",
-      "dates": "2018-2022"
-    }
-  ],
-  "experience": [
-    {
-      "title": "Senior Backend Engineer",
-      "company": "TechCorp", 
-      "duration": "2022-Present",
-      "location": "San Francisco, CA"
-    }
-  ],
-  "skills": ["Python", "Django", "AWS", "PostgreSQL"],
-  "about": "Experienced backend engineer passionate about fintech...",
-  "extracted_at": "2024-01-15T10:30:00Z",
-  "extraction_method": "Google Crawler"
-}
-```
-
-### 📋 Summary File Structure
-
-Batch processing creates additional summary files:
-
-```json
-{
-  "extraction_method": "google_crawler",
-  "extracted_at": "2024-01-15T14:30:22Z",
-  "total_profiles": 5,
-  "profiles": [
-    {
-      "name": "John Smith",
-      "title": "Senior Backend Engineer",
-      // ... complete profile data
-    }
-    // ... more profiles
-  ]
-}
-```
-
-### 🔄 Caching Workflow
-
-1. **Check Existing**: Look for `{username}.json` or `{name}.json`
-2. **Age Verification**: Check if file is < 7 days old
-3. **Cache Decision**: 
-   - ✅ **Use Cache**: If recent data exists
-   - 🔄 **Refresh**: If data is stale or missing
-4. **Save Immediately**: Write JSON after each profile extraction
-5. **Summary Creation**: Generate batch summary at completion
-
-## 🎯 Candidate Scoring
-
-Automatically scores candidates against job requirements:
-
-```json
-{
-  "overall_score": 8.5,
-  "recommendation": "STRONG_MATCH",
-  "score_breakdown": {
-    "experience_match": 9.0,
-    "skills_match": 8.0,
-    "location_match": 9.0,
-    "education_match": 8.0
-  },
-  "reasoning": "Strong match with 5+ years Python experience, fintech background, and San Francisco location."
-}
-```
-
-## 🚀 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/jobs` | POST | Submit new extraction job |
-| `/api/jobs/{job_id}/results` | GET | Get job results |
-| `/api/jobs` | GET | List all jobs |
-| `/api/health` | GET | System health check |
-| `/docs` | GET | Interactive API documentation |
-
-## ⚡ Performance
-
-| Method | Speed | Cost | Quality | GitHub Enhancement | Use Case |
-|--------|-------|------|---------|-------------------|----------|
-| RapidAPI | 3-8s* | $$ | High | ✅ Automatic | Production |
-| Google Crawler | 20-45s* | Free | Good | ✅ Automatic | Development/Testing |
-
-*_Times include GitHub data enhancement. Add 2-5s per profile for GitHub integration._
-
-## 🛠️ Advanced Configuration
-
-### Proxy Support (Optional)
-
-For enhanced reliability, configure Zyte proxy:
-
-```env
-ZYTE_API_KEY=your_zyte_key
-ZYTE_ENABLED=true
-```
-
-### Browser Settings
-
-```env
-HEADLESS=true                    # Run browser in headless mode
-BROWSER_TIMEOUT=30000           # Browser timeout in milliseconds
-REQUEST_DELAY=2                 # Delay between requests in seconds
-```
-
-### Testing vs Production
-
-```env
-TESTING_MODE=true               # Uses 3 profiles for quick testing
-# TESTING_MODE=false            # Uses 10 profiles for production
-```
-
-## 🐞 Troubleshooting
-
-### Common Issues
-
-1. **OpenAI API Error**: Ensure `OPENAI_API_KEY` is set correctly
-2. **Browser Timeout**: Increase `BROWSER_TIMEOUT` or check internet connection
-3. **RapidAPI Limit**: Check your RapidAPI quota and upgrade if needed
-4. **Redis Connection**: Ensure Redis is running on localhost:6379
-
-### Debug Mode
-
-Enable verbose logging:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-### Test Individual Components
+### 📋 Example 3: Batch Processing
 
 ```bash
-# Test AI keyword generation only
-python -c "
-import asyncio
-from utils.enhanced_google_extractor import IntegratedLinkedInExtractor
+# Process multiple job descriptions
+for job in "Backend Engineer" "Frontend Developer" "DevOps Engineer"; do
+  curl -X POST "http://localhost:8000/api/jobs" \
+    -H "Content-Type: application/json" \
+    -d "{\"job_description\": \"$job with Python experience\", \"search_method\": \"rapid_api\", \"limit\": 5}"
+done
+```
 
-async def test():
-    async with IntegratedLinkedInExtractor() as extractor:
-        keywords = extractor.generate_search_keywords('Backend engineer in fintech')
-        print(keywords.search_query)
+### 📋 Example 4: Monitor Job Progress
 
-asyncio.run(test())
-"
+```bash
+# Submit job and monitor
+JOB_ID=$(curl -s -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{"job_description": "Data Scientist with ML experience", "search_method": "rapid_api", "limit": 5}' \
+  | jq -r '.job_id')
+
+echo "Job ID: $JOB_ID"
+
+# Monitor until completion
+while true; do
+  STATUS=$(curl -s "http://localhost:8000/api/jobs/$JOB_ID/results" | jq -r '.status')
+  echo "Status: $STATUS"
+  
+  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+    break
+  fi
+  
+  sleep 5
+done
+
+# Get final results
+curl -s "http://localhost:8000/api/jobs/$JOB_ID/results" | jq '.candidates[].name'
 ```
 
 ## 📝 License
@@ -524,8 +880,15 @@ MIT License - see [LICENSE](LICENSE) file for details.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📞 Support
+## 📞 Support & Resources
 
-- **Issues**: [GitHub Issues](https://github.com/your-repo/linkedin-profile-extractor/issues)
-- **Documentation**: [API Docs](http://localhost:8000/docs)
-- **Health Check**: [System Status](http://localhost:8000/api/health) 
+- **🚀 Quick Start**: `python main.py` + `python worker.py`
+- **📚 API Docs**: http://localhost:8000/docs
+- **🔍 Health Check**: http://localhost:8000/api/health
+- **📊 Redis Monitor**: `redis-cli monitor`
+- **🐛 Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- **📧 Support**: [Contact Form](mailto:support@yourcompany.com)
+
+---
+
+🎯 **Ready to extract LinkedIn profiles at scale? Start with `python main.py` and `python worker.py`, then submit your first job!** 
