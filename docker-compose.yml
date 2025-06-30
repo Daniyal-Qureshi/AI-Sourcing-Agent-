@@ -1,44 +1,108 @@
 version: '3.8'
 
 services:
+  # Redis for caching and job queue
   redis:
     image: redis:7-alpine
+    container_name: linkedin-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - linkedin-network
 
+  # ARQ Worker for background processing
   worker:
     build: .
+    container_name: linkedin-worker
     command: python worker.py
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_DB=0
     env_file:
       - .env
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./output:/app/output
+      - ./logs:/app/logs
+    networks:
+      - linkedin-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
 
+  # FastAPI Application
   api:
     build: .
+    container_name: linkedin-api
     command: python main.py
     ports:
       - "8000:8000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_DB=0
     env_file:
       - .env
     depends_on:
-      - redis
-      - worker
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
     restart: unless-stopped
     volumes:
       - ./output:/app/output
+      - ./logs:/app/logs
+    networks:
+      - linkedin-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+  # Optional: Redis Commander (Web UI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: linkedin-redis-ui
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - linkedin-network
+    profiles:
+      - debug
 
 volumes:
-  redis_data: 
+  redis_data:
+    driver: local
+
+networks:
+  linkedin-network:
+    driver: bridge 
