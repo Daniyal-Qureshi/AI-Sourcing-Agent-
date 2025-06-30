@@ -19,7 +19,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Zyte Proxy Configuration
 ZYTE_API_KEY = os.getenv("ZYTE_API_KEY", "afacf0f6b8b841f2892a166c3a102741")
-ZYTE_PROXY_URL = "http://api.zyte.com:8011"
+ZYTE_PROXY_URL = os.getenv("ZYTE_PROXY_URL", "http://api.zyte.com:8011")
 ZYTE_ENABLED = os.getenv("ZYTE_ENABLED", "True").lower() == "true"
 
 # Search Configuration
@@ -53,10 +53,8 @@ PLAYWRIGHT_ARGS = [
 
 # File Paths
 OUTPUT_DIR = "./output"
-HTML_DIR = f"{OUTPUT_DIR}/html_profiles"
 JSON_DIR = f"{OUTPUT_DIR}/json_profiles"
 SEARCH_RESULTS_DIR = f"{OUTPUT_DIR}/search_results"
-SESSIONS_DIR = f"{OUTPUT_DIR}/sessions"
 
 # LinkedIn Profile Data Structure
 REQUIRED_PROFILE_FIELDS = [

@@ -394,6 +394,111 @@ async def root():
         "example_query": 'site:linkedin.com/in "backend engineer" "fintech" "San Francisco" "Python"'
     }
 
+@app.post("/api/hackathon/source-candidates")
+async def source_candidates_for_hackathon(
+    job_description: str,
+    search_method: Literal["rapid_api", "google_crawler"] = "rapid_api",
+    limit: int = 10
+):
+    """
+    Hackathon endpoint: Takes job description and returns top 10 candidates with personalized outreach.
+    
+    This endpoint specifically matches the Synapse AI Hackathon requirements:
+    - Input: Job description
+    - Output: Top 10 candidates with fit scores and personalized outreach messages
+    - Format: JSON with candidate profiles and key characteristics highlighted
+    """
+    
+    if not job_description or len(job_description.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Job description must be at least 10 characters long")
+    
+    if limit > 10:
+        limit = 10  # Cap at 10 for hackathon
+    
+    try:
+        logger.info(f"🎯 Hackathon endpoint: Processing job with {search_method}, limit: {limit}")
+        
+        # Process synchronously for immediate response (hackathon requirement)
+        if search_method == "rapid_api":
+            from utils.enhanced_workflow import search_with_rapid_api_and_score
+            search_result, scoring_result = await search_with_rapid_api_and_score(job_description, limit)
+        else:
+            from utils.enhanced_workflow import search_with_google_crawler_and_score
+            search_result, scoring_result = await search_with_google_crawler_and_score(job_description, limit)
+        
+        # Generate outreach messages
+        from worker import generate_outreach_async
+        outreach_messages = await generate_outreach_async(scoring_result.scored_candidates, job_description)
+        
+        # Format results in hackathon-required format
+        top_candidates = []
+        for candidate in scoring_result.scored_candidates[:limit]:
+            # ScoredCandidate has all profile fields directly
+            
+            # Extract key characteristics for highlighting
+            key_characteristics = []
+            if candidate.headline:
+                key_characteristics.append(f"Current role: {candidate.headline}")
+            if candidate.current_company:
+                key_characteristics.append(f"Company: {candidate.current_company}")
+            if candidate.location:
+                key_characteristics.append(f"Location: {candidate.location}")
+            if candidate.skills and len(candidate.skills) > 0:
+                key_characteristics.append(f"Top skills: {', '.join(candidate.skills[:3])}")
+            if hasattr(candidate, 'experience') and candidate.experience:
+                recent_exp = candidate.experience[0] if isinstance(candidate.experience, list) else None
+                if recent_exp and hasattr(recent_exp, 'company'):
+                    key_characteristics.append(f"Previous experience: {recent_exp.company}")
+            
+            candidate_data = {
+                "name": candidate.name,
+                "linkedin_url": candidate.linkedin_url,
+                "fit_score": round(candidate.score, 1),
+                "score_breakdown": {
+                    "education": round(candidate.score_breakdown.education, 1),
+                    "career_trajectory": round(candidate.score_breakdown.career_trajectory, 1), 
+                    "company_relevance": round(candidate.score_breakdown.company_relevance, 1),
+                    "experience_match": round(candidate.score_breakdown.experience_match, 1),
+                    "location_match": round(candidate.score_breakdown.location_match, 1),
+                    "tenure": round(candidate.score_breakdown.tenure, 1)
+                },
+                "key_characteristics": key_characteristics,
+                "job_match_highlights": [
+                    f"Fit score: {round(candidate.score, 1)}/10",
+                    f"Recommendation: {candidate.recommendation}",
+                    f"Skills alignment: {round(candidate.score_breakdown.experience_match, 1)}/10"
+                ],
+                "personalized_outreach_message": outreach_messages.get(candidate.linkedin_url, 
+                    f"Hi {candidate.name.split()[0]}, I came across your profile and was impressed by your background. I have an exciting opportunity that matches your expertise. Would you be open to a brief conversation?")
+            }
+            
+            top_candidates.append(candidate_data)
+        
+        # Sort by fit score descending
+        top_candidates.sort(key=lambda x: x["fit_score"], reverse=True)
+        
+        # Hackathon response format
+        hackathon_response = {
+            "job_id": f"hackathon-{int(time.time())}",
+            "candidates_found": len(top_candidates),
+            "search_method": search_method,
+            "processing_time_seconds": round(search_result.search_time + scoring_result.scoring_time, 2),
+            "top_candidates": top_candidates,
+            "summary": {
+                "average_fit_score": round(sum(c["fit_score"] for c in top_candidates) / len(top_candidates), 1) if top_candidates else 0,
+                "candidates_above_7": len([c for c in top_candidates if c["fit_score"] >= 7.0]),
+                "search_query_used": getattr(search_result, 'search_query', 'AI-optimized LinkedIn search'),
+                "ai_keywords_extracted": getattr(search_result, 'ai_keywords_used', True)
+            }
+        }
+        
+        logger.info(f"✅ Hackathon response ready: {len(top_candidates)} candidates, avg score: {hackathon_response['summary']['average_fit_score']}")
+        return hackathon_response
+        
+    except Exception as e:
+        logger.error(f"❌ Hackathon endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process candidates: {str(e)}")
+
 
 
 if __name__ == "__main__":

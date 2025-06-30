@@ -177,11 +177,34 @@ def _score_candidates(
             except Exception as e:
                 logger.warning(f"⚠️ Failed to score candidate {profile.name}: {e}")
                 # Create a failed candidate entry
+                from utils.candidate_scorer import ScoreBreakdown
                 failed_candidate = ScoredCandidate(
-                    candidate=profile,
-                    overall_score=0.0,
-                    score_breakdown={},
-                    reasoning="Scoring failed",
+                    # Original candidate fields
+                    name=profile.name,
+                    headline=profile.headline,
+                    linkedin_url=profile.linkedin_url,
+                    location=profile.location,
+                    summary=profile.summary,
+                    experience=profile.experience,
+                    education=profile.education,
+                    skills=profile.skills,
+                    connections=profile.connections,
+                    profile_image=profile.profile_image,
+                    current_company=profile.current_company,
+                    current_position=profile.current_position,
+                    
+                    # Failed scoring fields
+                    score=0.0,
+                    score_breakdown=ScoreBreakdown(
+                        education=0.0,
+                        career_trajectory=0.0,
+                        company_relevance=0.0,
+                        experience_match=0.0,
+                        location_match=0.0,
+                        tenure=0.0
+                    ),
+                    reasoning=None,
+                    passed=False,
                     recommendation="REJECT"
                 )
                 scored_candidates.append(failed_candidate)
