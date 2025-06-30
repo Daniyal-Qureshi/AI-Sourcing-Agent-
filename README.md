@@ -1,397 +1,531 @@
-# LinkedIn Profile Sourcing Agent
+# Streamlined LinkedIn Profile Extractor
 
-An AI-powered system for finding, extracting, scoring, and generating outreach for LinkedIn profiles based on job descriptions. **Now with fully integrated scalable worker system!**
+AI-powered LinkedIn profile sourcing with two optimized methods: **RapidAPI** and **Google Crawler**. Features intelligent keyword extraction, targeted searches, and comprehensive profile data extraction.
 
-## 🚀 What's New - Worker Integration
+## 🚀 Key Features
 
-### ✅ **Complete API Integration**
-The worker system is now **fully integrated** into the main API flow:
+- **AI-Powered Keyword Extraction**: Automatically generates optimal search terms from job descriptions
+- **Optimized Search Queries**: Uses format `site:linkedin.com/in "job_title" "industry" "location" "skills"`
+- **Two Extraction Methods**: Fast API-based (RapidAPI) and free browser automation (Google Crawler)
+- **Comprehensive Data**: Education, experience, skills, and about sections
+- **Intelligent Scoring**: AI-powered candidate ranking and recommendations
+- **Scalable Processing**: Async Redis Queue (ARQ) with distributed workers
 
-- **Default Processing**: All jobs now use the worker system by default
-- **Backward Compatibility**: Legacy processing available as fallback
-- **Smart Caching**: Username-based file naming with 7-day freshness validation
-- **Outreach Generation**: Automatic personalized message creation
-- **Real-time Monitoring**: Track job progress through multiple pipeline stages
+## 🎯 Example Search Query
 
-### 🔄 **Processing Flow**
+Input job description:
 ```
-Job Submission → Worker Pipeline → Results
-     ↓              ↓                ↓
-   API Call    1. Search Workers    Cached Data
-                2. Extract Workers   + Outreach
-                3. Outreach Workers  + Scoring
+Senior Backend Engineer at fintech startup in San Francisco. 
+Requires Python, Django, AWS experience. 
 ```
 
-## 🆕 New Two-Phase Approach
-
-### **Revolutionary Optimization for Large-Scale Processing**
-
-The system now supports a **NEW two-phase approach** that dramatically improves efficiency for large-scale LinkedIn profile processing:
-
-#### **Phase 1: HTML Scraping** 🕷️
-- Gets LinkedIn URLs from Google search
-- Scrapes **all** profile HTML pages in batch
-- **Closes browser immediately** after scraping
-- Smart duplicate detection (skips existing files)
-
-#### **Phase 2: Data Processing** 🔄
-- Processes HTML files **without opening browser**
-- Extracts structured profile data
-- No network requests needed
-- Can be run multiple times safely
-
-### **Key Benefits:**
-
-✅ **Efficiency**: Browser only open during scraping phase  
-✅ **Smart Caching**: Checks for existing HTML/JSON files by username  
-✅ **No Duplicates**: Skips already-processed profiles automatically  
-✅ **File Organization**: Clean username-based naming (`username.html`, `username.json`)  
-✅ **Separation of Concerns**: Scraping vs. processing completely separated  
-✅ **Recovery**: Can reprocess HTML files without re-scraping  
-
-### **Usage:**
-
-```python
-# Option 1: Use the integrated two-phase workflow
-from utils.enhanced_workflow import search_with_playwright_two_phase_and_score
-
-search_result, scoring_result = await search_with_playwright_two_phase_and_score(
-    job_description="Senior Python Developer in San Francisco",
-    limit=10
-)
-
-# Option 2: Manual phase separation for maximum control
-from utils.profile_extractor import scrape_html_only, process_html_files
-
-# Phase 1: Scrape HTML (browser opens and closes)
-html_results = await scrape_html_only(profile_urls, use_login=True)
-
-# Phase 2: Process HTML files (no browser needed)
-usernames = [r['username'] for r in html_results['results'] if r['success']]
-profiles = process_html_files(usernames)
+AI-generated search:
+```
+site:linkedin.com/in "backend engineer" "fintech" "San Francisco" "Python"
 ```
 
-### **API Support:**
+## 🛠️ Installation
 
-The two-phase approach is available via the API:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-repo/linkedin-profile-extractor
+   cd linkedin-profile-extractor
+   ```
 
-```bash
-# Use the new two-phase method
-POST /api/jobs
-{
-  "job_description": "Senior Python Developer...",
-  "search_method": "playwright_two_phase",  # <- NEW METHOD
-  "limit": 10
-}
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Install Playwright browsers**
+   ```bash
+   playwright install
+   ```
+
+5. **Setup environment variables**
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys
+   ```
+
+## ⚙️ Configuration
+
+Create `.env` file with required settings:
+
+```env
+# Required for AI keyword generation
+OPENAI_API_KEY=your_openai_api_key
+
+# Optional: For RapidAPI method
+RAPIDAPI_KEY=your_rapidapi_key
+
+# Optional: For enhanced proxy support
+ZYTE_API_KEY=your_zyte_proxy_key
+ZYTE_ENABLED=false
+
+# Search settings
+
+REQUEST_DELAY=2
+HEADLESS=true
 ```
 
-**Search Method Options:**
-- `"rapid_api"` - Uses RapidAPI (fast, requires credits)
-- `"playwright"` - Legacy single-phase browser automation  
-- `"playwright_two_phase"` - **NEW** optimized two-phase approach
+## 🔥 Quick Start
 
----
+### Method 1: API Server (Recommended)
 
-## 🛠 Core Components
-
-### 1. **Enhanced API Endpoints**
-
-**Main Job Processing (Worker-Integrated):**
-```bash
-# Submit job with worker system (recommended)
-POST /api/jobs
-{
-  "job_description": "Senior Python Developer...",
-  "search_method": "rapid_api",
-  "limit": 10,
-  "use_workers": true  # Default: true
-}
-
-# Advanced worker pipeline with outreach
-POST /api/jobs/worker-pipeline  
-{
-  "job_description": "Senior Python Developer...",
-  "search_method": "rapid_api",
-  "limit": 10,
-  "generate_outreach": true
-}
-
-# Legacy processing (fallback)
-POST /api/jobs/legacy
-{
-  "job_description": "Senior Python Developer...",
-  "search_method": "rapid_api",
-  "limit": 5
-}
-```
-
-**Worker System Monitoring:**
-```bash
-# Check worker system status
-GET /api/workers/status
-
-# Monitor specific worker task
-GET /api/workers/tasks/{task_id}
-
-# Direct worker control
-POST /api/workers/direct/search
-POST /api/workers/direct/extract  
-POST /api/workers/direct/outreach
-POST /api/workers/direct/pipeline
-```
-
-### 2. **Smart Processing Pipeline**
-
-**Stage 1: Profile Search** (15% progress)
-- Uses Rapid API or Google search via workers
-- Finds LinkedIn profile URLs
-- Caches search results
-
-**Stage 2: Profile Extraction** (40-75% progress)  
-- Smart caching check (username-based files)
-- Validates data freshness (< 7 days)
-- Extracts only if needed
-- Saves as `{username}.html` and `{username}.json`
-
-**Stage 3: Candidate Scoring** (80% progress)
-- Evaluates profiles against job requirements
-- Assigns scores and pass/fail status
-- Generates scoring breakdown
-
-**Stage 4: Outreach Generation** (85-95% progress)
-- Creates personalized LinkedIn messages
-- Connection requests and direct messages
-- Saves outreach data in profile JSON
-
-### 3. **File Organization**
-```
-output/
-├── html_profiles/          # Cleaned HTML files (username-based)
-│   ├── john-doe-123.html
-│   ├── jane-smith-456.html
-│   └── alex-johnson-789.html
-└── json_profiles/          # Complete profile data + outreach
-    ├── john-doe-123.json   # Profile + outreach messages
-    ├── jane-smith-456.json
-    └── alex-johnson-789.json
-```
-
-**Sample JSON Structure:**
-```json
-{
-  "name": "John Doe",
-  "headline": "Senior Python Developer at TechCorp",
-  "linkedin_url": "https://linkedin.com/in/john-doe-123",
-  "location": "San Francisco, CA",
-  "experience": [...],
-  "skills": [...],
-  "extracted_at": "2024-01-15T10:30:00",
-  "username": "john-doe-123",
-  "outreach": [
-    {
-      "message": "Hi John! I came across your profile...",
-      "outreach_type": "connection_request",
-      "generated_at": "2024-01-15T10:35:00",
-      "job_context": "Senior Python Developer position..."
-    }
-  ]
-}
-```
-
-### 4. **Intelligent Caching System**
-
-**Cache Flow:**
-1. **URL to Username**: Extract username from LinkedIn URL
-2. **File Check**: Look for `{username}.json` in cache
-3. **Freshness Validation**: Check if data is < 7 days old
-4. **Smart Decision**: Use cache or extract fresh data
-5. **Storage**: Save with username-based naming
-
-**Benefits:**
-- ⚡ **Faster Processing**: Avoid re-extracting recent profiles
-- 💰 **Cost Savings**: Reduce API calls and browser automation
-- 🎯 **Data Quality**: Fresh data when needed, cached when appropriate
-- 📊 **Easy Management**: Clear file naming and organization
-
-## 📊 API Usage Examples
-
-### Basic Job Submission (Worker-Based)
-```python
-import requests
-
-# Submit job with integrated worker system
-response = requests.post("http://localhost:8000/api/jobs", json={
-    "job_description": """
-    Senior Python Developer
-    - 5+ years Python experience  
-    - FastAPI/Django expertise
-    - San Francisco, CA
-    """,
-    "search_method": "rapid_api",
-    "limit": 10,
-    "use_workers": True  # Uses worker pipeline
-})
-
-job = response.json()
-job_id = job['job_id']
-
-# Monitor progress
-while True:
-    status_response = requests.get(f"http://localhost:8000/api/jobs/{job_id}/status")
-    status = status_response.json()
-    
-    print(f"Progress: {status['progress']}% - {status['message']}")
-    
-    if status['status'] == 'completed':
-        break
-    time.sleep(5)
-
-# Get results
-results = requests.get(f"http://localhost:8000/api/jobs/{job_id}/results").json()
-print(f"Found {results['total_candidates']} candidates")
-```
-
-### Advanced Worker Pipeline
-```python
-# Submit job with full worker pipeline
-response = requests.post("http://localhost:8000/api/jobs/worker-pipeline", json={
-    "job_description": "Machine Learning Engineer with 3+ years experience",
-    "search_method": "rapid_api", 
-    "limit": 15,
-    "generate_outreach": True
-})
-
-# This automatically:
-# 1. Searches for profiles using workers
-# 2. Extracts profile data with smart caching  
-# 3. Generates personalized outreach messages
-# 4. Saves everything with username-based naming
-```
-
-### Direct Worker Control
-```python
-# Direct search using workers
-search_response = requests.post("http://localhost:8000/api/workers/direct/search", json={
-    "job_description": "Backend developer",
-    "search_method": "rapid_api",
-    "limit": 5
-})
-
-task_id = search_response.json()['task_id']
-
-# Monitor worker task
-task_status = requests.get(f"http://localhost:8000/api/workers/tasks/{task_id}").json()
-print(f"Task status: {task_status['status']}")
-```
-
-## 🔧 Setup & Installation
-
-### 1. Install Dependencies
-```bash
-cd linkedin-profile-extractor
-pip install -r requirements.txt
-```
-
-### 2. Environment Setup
-```bash
-cp env.example .env
-# Edit .env with your API keys
-```
-
-### 3. Run the API Server
+Start the FastAPI server:
 ```bash
 python main.py
 ```
 
-The API server now starts with:
-- ✅ **Worker System**: 8 concurrent workers for scalable processing
-- ✅ **Smart Caching**: Username-based file management
-- ✅ **Outreach Generation**: Automatic personalized messaging
-- ✅ **Real-time Monitoring**: Progress tracking and task status
-
-### 4. Test Integration
+Submit a job via API:
 ```bash
-python test_worker_integration.py
-```
-
-## 🎯 Key Benefits
-
-### **Scalability**
-- **8 Concurrent Workers**: Process multiple profiles simultaneously
-- **Priority Queue**: Important jobs processed first
-- **Automatic Retry**: Failed tasks automatically retried
-- **Load Balancing**: Intelligent task distribution
-
-### **Intelligence**
-- **Smart Caching**: Avoid unnecessary re-extraction (saves time & money)
-- **Freshness Validation**: Ensures data quality with 7-day freshness checks
-- **Username-based Naming**: Clear, consistent file organization
-- **Context-aware Outreach**: Personalized messages using profile + job data
-
-### **Reliability**
-- **Error Handling**: Comprehensive error catching and logging
-- **Task Monitoring**: Real-time status tracking for all operations
-- **Graceful Shutdown**: Clean worker system shutdown
-- **Data Persistence**: All data saved in structured JSON format
-
-### **User Experience**
-- **Progress Tracking**: Real-time updates during processing
-- **Multiple Processing Options**: Worker, legacy, and direct control
-- **Backward Compatibility**: Existing code continues to work
-- **Enhanced Results**: Profiles include outreach messages automatically
-
-## 🔄 Migration Guide
-
-### For Existing Users
-The API is **backward compatible**. Existing code will automatically use the worker system:
-
-**Before (still works):**
-```python
-response = requests.post("/api/jobs", json={
-    "job_description": "Python developer",
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_description": "Senior Backend Engineer at fintech startup in San Francisco. Requires Python, Django, AWS experience.",
     "search_method": "rapid_api",
     "limit": 5
-})
+  }'
 ```
 
-**Now Enhanced:**
-The same call now automatically:
-- ✅ Uses worker system for scalability
-- ✅ Implements smart caching
-- ✅ Generates outreach messages  
-- ✅ Saves with username-based naming
+Check job results:
+```bash
+curl "http://localhost:8000/api/jobs/{job_id}/results"
+```
 
-**For Maximum Features:**
+### Method 2: Direct Script Usage
+
 ```python
-response = requests.post("/api/jobs/worker-pipeline", json={
-    "job_description": "Python developer", 
-    "search_method": "rapid_api",
-    "limit": 5,
-    "generate_outreach": True
-})
+import asyncio
+from utils.enhanced_google_extractor import extract_profiles_rapid_api, extract_profiles_google_crawler
+
+async def main():
+    job_description = """
+    Senior Backend Engineer at fintech startup in San Francisco.
+    Requires Python, Django, AWS experience.
+    """
+    
+    # Method 1: RapidAPI (fast, requires credits)
+    profiles = await extract_profiles_rapid_api(job_description, max_results=5)
+    
+    # Method 2: Google Crawler (free, slower)
+    profiles = await extract_profiles_google_crawler(job_description, max_results=5)
+    
+    for profile in profiles:
+        print(f"{profile.name} - {profile.headline}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-## 🔮 What's Next
+### Method 3: Test the Integration
 
-- **AI-Powered Outreach**: GPT integration for smarter messaging
-- **A/B Testing**: Message effectiveness tracking
-- **CRM Integration**: Export to popular CRM systems
-- **Analytics Dashboard**: Visual progress and performance tracking
-- **Webhook Notifications**: Real-time updates via webhooks
-- **Rate Limiting**: LinkedIn compliance features
+```bash
+# Complete integration test with caching verification
+python test_streamlined_integration.py
 
----
+# Quick verification of caching and JSON output
+python verify_caching.py
 
-## 🎉 Summary
+# Test GitHub integration and enhancement features
+python test_github_integration.py
+```
 
-The LinkedIn Sourcing Agent now features a **fully integrated worker system** that provides:
+## 📊 Two Main Methods
 
-✅ **Scalable Processing**: 8 concurrent workers handle multiple profiles  
-✅ **Smart Caching**: Username-based files with freshness validation  
-✅ **Automatic Outreach**: Personalized LinkedIn messages  
-✅ **Real-time Monitoring**: Track progress through pipeline stages  
-✅ **Easy Integration**: Works with existing code, enhanced features available  
+### 1. RapidAPI Method (`rapid_api`)
 
-**Ready to use!** Start the server with `python main.py` and submit jobs to experience intelligent, scalable LinkedIn sourcing.
+**Best for**: Production use with budget for API calls
 
-For detailed testing, run: `python test_worker_integration.py` 
+**Features**:
+- Fast API-based search (2-5 seconds)
+- High-quality, structured data
+- Requires RapidAPI credits
+- Built-in rate limiting
+
+**Usage**:
+```python
+profiles = await extract_profiles_rapid_api(job_description, max_results=10)
+```
+
+### 2. Google Crawler Method (`google_crawler`)
+
+**Best for**: Development, testing, or budget-conscious usage
+
+**Features**:
+- Free browser automation (15-30 seconds)
+- Comprehensive data extraction
+- Targeted searches for education, experience, skills
+- No API costs
+
+**Usage**:
+```python
+profiles = await extract_profiles_google_crawler(job_description, max_results=10)
+```
+
+## 🧠 AI Keyword Generation
+
+The system uses OpenAI to automatically extract the best search keywords from job descriptions:
+
+**Input**:
+```
+We are looking for a Senior Backend Engineer to join our fintech startup in San Francisco.
+Requirements: Python, Django, PostgreSQL, AWS, microservices architecture.
+```
+
+**AI Output**:
+```json
+{
+  "job_title": "Senior Backend Engineer",
+  "industry": "fintech",
+  "location": "San Francisco",
+  "skills": ["Python", "Django", "AWS"],
+  "companies": ["fintech startups", "financial technology"],
+  "search_query": "site:linkedin.com/in \"Senior Backend Engineer\" \"fintech\" \"San Francisco\" \"Python\""
+}
+```
+
+## 🔗 GitHub Integration (NEW!)
+
+The system automatically enhances LinkedIn profiles with comprehensive GitHub data using intelligent name matching and AI-powered README analysis.
+
+### 🎯 Features
+
+**Automatic Discovery**:
+- Searches GitHub using LinkedIn profile names
+- Intelligent username matching with multiple formats
+- Handles common name variations and titles
+
+**Repository Analysis**:
+- Fetches all public repositories (up to 100)
+- Extracts programming languages and usage statistics  
+- Identifies top technologies and frameworks
+- Calculates language proficiency by code volume
+
+**AI-Powered README Analysis**:
+- Downloads and analyzes GitHub profile READMEs
+- Extracts professional skills and achievements
+- Identifies experience level and specializations
+- Discovers additional contact information
+
+### 📊 GitHub Data Structure
+
+Each profile is enhanced with comprehensive GitHub information:
+
+```json
+{
+  "name": "John Smith",
+  "title": "Senior Backend Engineer",
+  "skills": ["Python", "Django", "JavaScript", "Go", "TypeScript"],  // Enhanced with GitHub languages
+  "location": "San Francisco, CA",  // Updated from GitHub if missing
+  "github_data": {
+    "username": "johnsmith",
+    "profile_url": "https://github.com/johnsmith",
+    "bio": "🚀 Building Scalable Systems and Delivering High-Performance Applications",
+    "company": "TechCorp",
+    "blog": "https://johnsmith.dev",
+    "public_repos": 46,
+    "followers": 230,
+    "following": 155,
+    "top_languages": {
+      "Python": 15420,
+      "JavaScript": 8930,
+      "Go": 5210,
+      "TypeScript": 3140,
+      "Dockerfile": 890
+    },
+    "notable_repositories": [
+      {
+        "name": "awesome-api-framework",
+        "description": "High-performance API framework for microservices",
+        "language": "Python",
+        "stars": 127,
+        "url": "https://github.com/johnsmith/awesome-api-framework"
+      }
+    ],
+    "ai_insights": {
+      "skills": ["Docker", "Kubernetes", "React", "Node.js"],
+      "experience_level": "senior",
+      "specialization": "Full-stack Development with DevOps",
+      "achievements": ["Open source contributor", "Tech conference speaker"],
+      "certifications": ["AWS Certified Solutions Architect"]
+    }
+  }
+}
+```
+
+### 🔍 GitHub Search Process
+
+1. **Name Processing**: Extracts first + last name from LinkedIn profile
+2. **Username Generation**: Creates search queries like:
+   - `Daniyal+Qureshi`
+   - `Daniyal-Qureshi` 
+   - `DaniyalQureshi`
+   - `Daniyal_Qureshi`
+3. **Profile Matching**: Uses GitHub search API to find matching users
+4. **Data Extraction**: Fetches profile, repositories, and languages
+5. **README Analysis**: Downloads and analyzes profile README with AI
+6. **Skills Enhancement**: Merges programming languages with existing skills
+
+### 🤖 AI README Analysis
+
+When a GitHub profile README is found, AI extracts:
+
+- **Technical Skills**: Programming languages, frameworks, tools
+- **Projects**: Notable projects and their descriptions
+- **Experience Level**: Estimated seniority (junior/mid/senior)
+- **Specialization**: Primary areas of expertise
+- **Achievements**: Open source contributions, certifications
+- **Contact Info**: Additional ways to reach the candidate
+
+### 📈 Enhanced Profile Benefits
+
+**For Recruiters**:
+- Complete technical skill assessment
+- Real coding activity and contributions
+- Project portfolio and code quality insights
+- Open source involvement and community presence
+
+**For Candidates**:
+- Comprehensive technical profile
+- Showcase of real work and projects
+- Evidence of continuous learning
+- Community contributions and reputation
+
+### ⚙️ GitHub API Configuration
+
+No additional setup required! GitHub integration works automatically with:
+- **Public GitHub API**: No authentication needed for public data
+- **Rate Limiting**: Built-in respectful API usage
+- **Error Handling**: Graceful fallback when GitHub data unavailable
+- **Performance**: Async processing with minimal impact on extraction speed
+
+## 🔄 Scalable Processing with ARQ
+
+The system uses **Async Redis Queue (ARQ)** for scalable distributed processing:
+
+**Features**:
+- Process up to 10 jobs concurrently
+- Automatic retries and error handling
+- 7-day result caching
+- Real-time job status tracking
+
+**Start ARQ Worker**:
+```bash
+python arq_worker.py
+```
+
+**Worker Configuration**:
+- **Max Jobs**: 10 concurrent
+- **Timeout**: 10 minutes per job
+- **Retry**: Automatic with exponential backoff
+- **Caching**: 7-day Redis cache
+
+## 📁 Smart Caching & JSON Output
+
+### 🧠 Intelligent Caching System
+
+The system automatically saves individual JSON files for each candidate and implements smart caching:
+
+**Key Features:**
+- **Individual JSON Files**: Each candidate gets their own file (e.g., `john-smith-123.json`)
+- **Smart Filename Generation**: Uses LinkedIn username or sanitized name
+- **7-Day Freshness Check**: Automatically refreshes data older than 7 days
+- **Duplicate Prevention**: Skips re-crawling existing recent profiles
+- **Summary Files**: Additional timestamped summary files for batch processing
+
+**File Structure:**
+```
+output/json_profiles/
+├── john-smith-123.json              # Individual profile (from LinkedIn username)
+├── jane-doe-456.json                # Individual profile  
+├── profiles_summary_google_crawler_20240115_143022.json  # Batch summary
+└── profiles_summary_rapid_api_20240115_143155.json       # Batch summary
+```
+
+### 📄 Individual Profile JSON Structure
+
+Each candidate file contains complete profile data:
+
+```json
+{
+  "name": "John Smith",
+  "title": "Senior Backend Engineer", 
+  "company": "TechCorp",
+  "location": "San Francisco, CA",
+  "linkedin_url": "https://linkedin.com/in/johnsmith",
+  "followers": "500+ followers",
+  "education": [
+    {
+      "school": "Stanford University",
+      "degree": "BS Computer Science", 
+      "field": "Computer Science",
+      "dates": "2018-2022"
+    }
+  ],
+  "experience": [
+    {
+      "title": "Senior Backend Engineer",
+      "company": "TechCorp", 
+      "duration": "2022-Present",
+      "location": "San Francisco, CA"
+    }
+  ],
+  "skills": ["Python", "Django", "AWS", "PostgreSQL"],
+  "about": "Experienced backend engineer passionate about fintech...",
+  "extracted_at": "2024-01-15T10:30:00Z",
+  "extraction_method": "Google Crawler"
+}
+```
+
+### 📋 Summary File Structure
+
+Batch processing creates additional summary files:
+
+```json
+{
+  "extraction_method": "google_crawler",
+  "extracted_at": "2024-01-15T14:30:22Z",
+  "total_profiles": 5,
+  "profiles": [
+    {
+      "name": "John Smith",
+      "title": "Senior Backend Engineer",
+      // ... complete profile data
+    }
+    // ... more profiles
+  ]
+}
+```
+
+### 🔄 Caching Workflow
+
+1. **Check Existing**: Look for `{username}.json` or `{name}.json`
+2. **Age Verification**: Check if file is < 7 days old
+3. **Cache Decision**: 
+   - ✅ **Use Cache**: If recent data exists
+   - 🔄 **Refresh**: If data is stale or missing
+4. **Save Immediately**: Write JSON after each profile extraction
+5. **Summary Creation**: Generate batch summary at completion
+
+## 🎯 Candidate Scoring
+
+Automatically scores candidates against job requirements:
+
+```json
+{
+  "overall_score": 8.5,
+  "recommendation": "STRONG_MATCH",
+  "score_breakdown": {
+    "experience_match": 9.0,
+    "skills_match": 8.0,
+    "location_match": 9.0,
+    "education_match": 8.0
+  },
+  "reasoning": "Strong match with 5+ years Python experience, fintech background, and San Francisco location."
+}
+```
+
+## 🚀 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs` | POST | Submit new extraction job |
+| `/api/jobs/{job_id}/results` | GET | Get job results |
+| `/api/jobs` | GET | List all jobs |
+| `/api/health` | GET | System health check |
+| `/docs` | GET | Interactive API documentation |
+
+## ⚡ Performance
+
+| Method | Speed | Cost | Quality | GitHub Enhancement | Use Case |
+|--------|-------|------|---------|-------------------|----------|
+| RapidAPI | 3-8s* | $$ | High | ✅ Automatic | Production |
+| Google Crawler | 20-45s* | Free | Good | ✅ Automatic | Development/Testing |
+
+*_Times include GitHub data enhancement. Add 2-5s per profile for GitHub integration._
+
+## 🛠️ Advanced Configuration
+
+### Proxy Support (Optional)
+
+For enhanced reliability, configure Zyte proxy:
+
+```env
+ZYTE_API_KEY=your_zyte_key
+ZYTE_ENABLED=true
+```
+
+### Browser Settings
+
+```env
+HEADLESS=true                    # Run browser in headless mode
+BROWSER_TIMEOUT=30000           # Browser timeout in milliseconds
+REQUEST_DELAY=2                 # Delay between requests in seconds
+```
+
+### Testing vs Production
+
+```env
+TESTING_MODE=true               # Uses 3 profiles for quick testing
+# TESTING_MODE=false            # Uses 10 profiles for production
+```
+
+## 🐞 Troubleshooting
+
+### Common Issues
+
+1. **OpenAI API Error**: Ensure `OPENAI_API_KEY` is set correctly
+2. **Browser Timeout**: Increase `BROWSER_TIMEOUT` or check internet connection
+3. **RapidAPI Limit**: Check your RapidAPI quota and upgrade if needed
+4. **Redis Connection**: Ensure Redis is running on localhost:6379
+
+### Debug Mode
+
+Enable verbose logging:
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+### Test Individual Components
+
+```bash
+# Test AI keyword generation only
+python -c "
+import asyncio
+from utils.enhanced_google_extractor import IntegratedLinkedInExtractor
+
+async def test():
+    async with IntegratedLinkedInExtractor() as extractor:
+        keywords = extractor.generate_search_keywords('Backend engineer in fintech')
+        print(keywords.search_query)
+
+asyncio.run(test())
+"
+```
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-repo/linkedin-profile-extractor/issues)
+- **Documentation**: [API Docs](http://localhost:8000/docs)
+- **Health Check**: [System Status](http://localhost:8000/api/health) 

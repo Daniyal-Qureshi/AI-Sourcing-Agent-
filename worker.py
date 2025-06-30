@@ -1,6 +1,6 @@
 """
-ARQ Worker for Scalable LinkedIn Profile Processing
-Handles complete job workflows with true async scalability
+ARQ Worker for Streamlined LinkedIn Profile Processing
+Handles AI-powered keyword extraction and profile sourcing with two optimized methods
 """
 import asyncio
 import logging
@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 
 async def process_job(ctx: Dict[str, Any], job_id: str, job_description: str, search_method: str, limit: int, cache_key: str) -> Dict[str, Any]:
     """
-    ARQ job function: Process complete LinkedIn sourcing pipeline
+    ARQ job function: Process complete LinkedIn sourcing pipeline with AI keywords
     
     Args:
         ctx: ARQ context
         job_id: Unique job identifier
-        job_description: Job description to process
-        search_method: Search method to use
+        job_description: Job description to analyze and extract keywords from
+        search_method: Search method to use ('rapid_api' or 'google_crawler')
         limit: Number of profiles to find
         cache_key: Cache key for results
         
@@ -31,51 +31,48 @@ async def process_job(ctx: Dict[str, Any], job_id: str, job_description: str, se
         Dict with job results
     """
     # Context info for better error tracking
-    logger.info(f"🚀 ARQ Processing job {job_id} (attempt {ctx.get('job_try', 1)})")
-    logger.info(f"🚀 ARQ Processing job {job_id}")
+    logger.info(f"🚀 ARQ Processing job {job_id} with AI keywords (attempt {ctx.get('job_try', 1)})")
+    logger.info(f"🎯 Method: {search_method}, Job description length: {len(job_description)} chars, Limit: {limit}")
     
     try:
         # Update status at start
         RedisCache.update_job_status(job_id, {
             "status": "processing",
             "started_at": datetime.now().isoformat(),
-            "message": "Processing with ARQ worker"
+            "message": f"Processing with {search_method} and AI keyword extraction"
         })
         
-        # Use enhanced workflow (already does search + extraction + scoring)
-        logger.info(f"🔍 Processing job with enhanced workflow using {search_method}")
+        # Use streamlined workflow with AI keyword generation
+        logger.info(f"🔍 Processing job with streamlined workflow using {search_method}")
         
         if search_method == "rapid_api":
             from utils.enhanced_workflow import search_with_rapid_api_and_score
-            loop = asyncio.get_event_loop()
-            search_result, scoring_result = await loop.run_in_executor(
-                None, search_with_rapid_api_and_score, job_description, limit
-            )
-        elif search_method == "playwright":
-            from utils.enhanced_workflow import search_with_playwright_and_score
-            search_result, scoring_result = await search_with_playwright_and_score(job_description, limit)
-        elif search_method == "playwright_two_phase":
-            from utils.enhanced_workflow import search_with_playwright_two_phase_and_score
-            search_result, scoring_result = await search_with_playwright_two_phase_and_score(job_description, limit)
+            search_result, scoring_result = await search_with_rapid_api_and_score(job_description, limit)
+        elif search_method == "google_crawler":
+            from utils.enhanced_workflow import search_with_google_crawler_and_score
+            search_result, scoring_result = await search_with_google_crawler_and_score(job_description, limit)
         else:
-            raise ValueError(f"Unknown search method: {search_method}. Use 'rapid_api', 'playwright', or 'playwright_two_phase'")
+            raise ValueError(f"Unknown search method: {search_method}. Use 'rapid_api' or 'google_crawler'")
         
-        # Step 2: Generate outreach messages concurrently
+        # Generate outreach messages concurrently
         logger.info(f"💬 Generating outreach for {len(scoring_result.scored_candidates)} candidates")
         outreach_messages = await generate_outreach_async(scoring_result.scored_candidates, job_description)
         
         # Format final results
         candidates = []
         for candidate in scoring_result.scored_candidates:
+            # Extract LinkedIn profile from ScoredCandidate
+            profile = candidate.candidate
+            
             candidates.append(CandidateInfo(
-                name=candidate.name,
-                linkedin_url=candidate.linkedin_url,
-                fit_score=candidate.score,
+                name=profile.name,
+                linkedin_url=profile.linkedin_url,
+                fit_score=candidate.overall_score,
                 score_breakdown=candidate.score_breakdown,
-                outreach_message=outreach_messages.get(candidate.linkedin_url, "Hi, I'd like to connect with you."),
-                headline=candidate.headline,
-                location=candidate.location,
-                passed=candidate.passed
+                outreach_message=outreach_messages.get(profile.linkedin_url, "Hi, I'd like to connect with you."),
+                headline=profile.headline,
+                location=profile.location,
+                passed=candidate.recommendation in ["STRONG_MATCH", "GOOD_MATCH", "CONSIDER"]
             ))
         
         results_data = {
@@ -86,6 +83,8 @@ async def process_job(ctx: Dict[str, Any], job_id: str, job_description: str, se
             "search_method": search_method,
             "search_time": search_result.search_time,
             "scoring_time": scoring_result.scoring_time,
+            "ai_keywords_used": search_result.ai_keywords_used,
+            "search_query": search_result.search_query,
             "candidates": [c.dict() for c in candidates]
         }
         
@@ -99,17 +98,22 @@ async def process_job(ctx: Dict[str, Any], job_id: str, job_description: str, se
         RedisCache.update_job_status(job_id, {
             "status": "completed",
             "completed_at": datetime.now().isoformat(),
-            "message": "Job completed successfully",
+            "message": f"Job completed successfully with {search_method} and AI keywords",
             "total_candidates": scoring_result.total_candidates,
-            "passed_candidates": len(scoring_result.passed_candidates)
+            "passed_candidates": len(scoring_result.passed_candidates),
+            "ai_keywords_used": True,
+            "search_query": search_result.search_query
         })
         
         logger.info(f"✅ ARQ job {job_id} completed: {len(scoring_result.passed_candidates)}/{scoring_result.total_candidates} candidates")
+        logger.info(f"🎯 AI Search query used: {search_result.search_query}")
         
         return {
             "status": "completed",
             "total_candidates": scoring_result.total_candidates,
-            "passed_candidates": len(scoring_result.passed_candidates)
+            "passed_candidates": len(scoring_result.passed_candidates),
+            "ai_keywords_used": True,
+            "search_query": search_result.search_query
         }
         
     except Exception as e:
@@ -127,23 +131,27 @@ async def process_job(ctx: Dict[str, Any], job_id: str, job_description: str, se
 
 
 async def generate_outreach_async(candidates: list, job_description: str) -> Dict[str, str]:
-    """Generate outreach messages concurrently"""
-    from utils.profile_extractor import generate_outreach_message
+    """Generate outreach messages concurrently for scored candidates"""
     
     async def generate_single(candidate):
         try:
-            loop = asyncio.get_event_loop()
-            message = await loop.run_in_executor(
-                None,
-                generate_outreach_message,
-                candidate.linkedin_url,
-                job_description,
-                "connection_request"
-            )
-            return candidate.linkedin_url, message
+            # Extract LinkedIn profile from ScoredCandidate
+            profile = candidate.candidate
+            linkedin_url = profile.linkedin_url
+            
+            # Simple outreach message generation
+            outreach_message = f"Hi {profile.name}! I came across your profile and was impressed by your background"
+            if profile.headline:
+                outreach_message += f" as a {profile.headline}"
+            if profile.location:
+                outreach_message += f" in {profile.location}"
+            outreach_message += ". I have an exciting opportunity that matches your expertise. Would you be open to a brief conversation?"
+            
+            return linkedin_url, outreach_message
+            
         except Exception as e:
-            logger.error(f"Failed outreach for {candidate.linkedin_url}: {e}")
-            return candidate.linkedin_url, "Hi, I'd like to connect with you regarding an opportunity that matches your background."
+            logger.error(f"Failed outreach generation: {e}")
+            return getattr(candidate.candidate, 'linkedin_url', ''), "Hi, I'd like to connect with you regarding an opportunity that matches your background."
     
     # Generate all outreach concurrently
     tasks = [generate_single(candidate) for candidate in candidates]
@@ -154,10 +162,10 @@ async def generate_outreach_async(candidates: list, job_description: str) -> Dic
 
 # ARQ Configuration
 class WorkerSettings:
-    """ARQ worker settings"""
+    """ARQ worker settings for streamlined processing"""
     redis_settings = RedisSettings(host='localhost', port=6379, database=0)
     functions = [process_job]
-    max_jobs = 10  # Process up to 10 jobs concurrently
+    max_jobs = 10  
     job_timeout = 600  # 10 minutes timeout per job
     keep_result = 3600  # Keep results for 1 hour
     
@@ -182,11 +190,13 @@ if __name__ == '__main__':
     
     async def main():
         """Run the ARQ worker"""
-        logger.info("🚀 Starting ARQ Worker for LinkedIn Profile Processing")
+        logger.info("🚀 Starting Streamlined ARQ Worker with AI Keywords")
         logger.info("📋 Worker Configuration:")
         logger.info(f"   • Max concurrent jobs: {WorkerSettings.max_jobs}")
         logger.info(f"   • Job timeout: {WorkerSettings.job_timeout} seconds")
         logger.info(f"   • Redis: {WorkerSettings.redis_settings.host}:{WorkerSettings.redis_settings.port}")
+        logger.info(f"   • Supported methods: rapid_api, google_crawler")
+        logger.info(f"   • Features: AI keyword extraction, targeted searches, comprehensive profiles")
         logger.info("🔄 Worker is ready to process jobs... (Press Ctrl+C to stop)")
         
         from arq.worker import create_worker
@@ -195,15 +205,17 @@ if __name__ == '__main__':
         try:
             await worker.main()
         except asyncio.CancelledError:
-            logger.info("✅ ARQ Worker task cancelled")
-        except Exception as e:
-            logger.error(f"❌ Worker error: {e}")
-            raise
-
-from arq import run_worker
-
-from arq_worker import WorkerSettings  # adjust if your file/module is named differently
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(run_worker(WorkerSettings))
+            logger.info("💤 Worker shutdown completed")
+        except KeyboardInterrupt:
+            logger.info("🛑 Worker interrupted, shutting down gracefully...")
+        finally:
+            logger.info("👋 ARQ Worker stopped")
+    
+    # Run the worker
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 ARQ Worker stopped by user")
+    except Exception as e:
+        logger.error(f"❌ ARQ Worker error: {e}")
+        sys.exit(1)

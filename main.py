@@ -6,11 +6,8 @@ import logging
 import uuid
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Literal
 from contextlib import asynccontextmanager
-
-from typing import Literal
-
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,11 +24,9 @@ from models.api_models import (
 from utils.redis_cache import RedisCache, generate_cache_key
 from utils.enhanced_workflow import (
     search_with_rapid_api_and_score, 
-    search_with_playwright_and_score,
-    search_with_playwright_two_phase_and_score,
+    search_with_google_crawler_and_score,
     process_job_rapid_api, 
-    process_job_playwright,
-    process_job_playwright_two_phase
+    process_job_google_crawler
 )
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -62,14 +57,14 @@ def run_async_task(coro):
         future = asyncio.ensure_future(coro)
         return loop.run_until_complete(future)
 
-def get_playwright_results(job_description: str, limit: int):
-    async def run_playwright():
-        return await search_with_playwright_and_score(
+def get_google_crawler_results(job_description: str, limit: int):
+    async def run_google_crawler():
+        return await search_with_google_crawler_and_score(
             job_description=job_description,
             limit=limit
         )
 
-    return run_async_task(run_playwright())
+    return run_async_task(run_google_crawler())
     
 
 @asynccontextmanager
@@ -78,7 +73,7 @@ async def lifespan(app: FastAPI):
     global arq_pool
     
     # Startup
-    logger.info("🚀 Starting LinkedIn Sourcing Agent API with ARQ")
+    logger.info("🚀 Starting Streamlined LinkedIn Sourcing API with AI Keywords")
     arq_pool = await create_pool(RedisSettings(host='localhost', port=6379, database=0))
     logger.info("✅ ARQ system ready")
     
@@ -93,9 +88,9 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="LinkedIn Profile Sourcing API", 
-    description="Scalable LinkedIn profile sourcing with ARQ: Async Redis Queue processing with true concurrency, distributed workers, and smart caching",
-    version="4.0.0",
+    title="Streamlined LinkedIn Profile Sourcing API", 
+    description="AI-powered LinkedIn profile sourcing with two optimized methods: RapidAPI and Google crawler. Features intelligent keyword extraction, targeted searches, and comprehensive profile data extraction.",
+    version="5.0.0",
     lifespan=lifespan
 )
 
@@ -105,38 +100,38 @@ app = FastAPI(
 @app.post("/api/jobs", response_model=JobResponse)
 async def submit_job(
     job_description: str,
-    search_method: Literal["rapid_api", "playwright", "playwright_two_phase"] = Query(default="rapid_api"),
+    search_method: Literal["rapid_api", "google_crawler"] = Query(default="rapid_api"),
     limit: int = 5
 ):
     """
-    Submit a job for processing using ARQ (Async Redis Queue).
+    Submit a job for processing using ARQ (Async Redis Queue) with AI-powered keyword generation.
     
     Args:
-        job_description: The job description to process
-        search_method: "rapid_api", "playwright", or "playwright_two_phase"
-        limit: Maximum number of profiles to process
+        job_description: The job description to process and extract keywords from using AI
+        search_method: "rapid_api" or "google_crawler"
+        limit: Maximum number of profiles to process (1-50)
     
-    Search Methods:
-    - "rapid_api": Use RapidAPI for profile search (faster, requires API credits)
-    - "playwright": Legacy single-phase browser automation (slower, browser stays open)
-    - "playwright_two_phase": NEW optimized approach (scrape HTML first, then process)
+    Streamlined Search Methods:
+    - "rapid_api": Fast API-based search with AI-generated keywords (requires API credits)
+    - "google_crawler": Google search automation with AI-optimized queries (no API costs)
     
-    The ARQ system provides:
-    - True async/await processing with Redis backend
-    - Scalable distributed workers (up to 10 concurrent jobs)
-    - Single job worker handling complete pipeline end-to-end
-    - Concurrent profile extraction and outreach generation
-    - Smart 7-day profile caching with username-based storage
-    - Automatic retries and job timeout handling
-    - Full pipeline: search → extract → score → outreach
+    Key Features:
+    - AI-powered keyword extraction from job descriptions
+    - Optimized search queries: site:linkedin.com/in "job_title" "industry" "location" "skills"
+    - Smart profile extraction with education, experience, skills, and about sections
+    - Intelligent candidate scoring and ranking
+    - 7-day profile caching for fast repeated searches
+    - Distributed ARQ processing with automatic retries
+    
+    Example AI-generated search: site:linkedin.com/in "backend engineer" "fintech" "San Francisco" "Python"
     """
     logger.info(f"📝 Received job submission: {search_method}, limit: {limit}")
     
     if not job_description or len(job_description.strip()) < 10:
         raise HTTPException(status_code=400, detail="Job description must be at least 10 characters long")
     
-    if search_method not in ["rapid_api", "playwright", "playwright_two_phase"]:
-        raise HTTPException(status_code=400, detail="Search method must be 'rapid_api', 'playwright', or 'playwright_two_phase'")
+    if search_method not in ["rapid_api", "google_crawler"]:
+        raise HTTPException(status_code=400, detail="Search method must be 'rapid_api' or 'google_crawler'")
     
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="Limit must be between 1 and 50")
@@ -367,8 +362,9 @@ async def health_check():
             "features": {
                 "async_processing": "True async with ARQ",
                 "concurrent_jobs": "Up to 10 jobs concurrently",
-                "search_methods": ["rapid_api", "playwright"],
-                "pipeline_features": ["search", "extraction", "scoring", "outreach"]
+                "search_methods": ["rapid_api", "google_crawler"],
+                "ai_features": ["keyword_extraction", "optimized_queries", "targeted_searches"],
+                "pipeline_features": ["ai_keywords", "search", "extraction", "scoring", "outreach"]
             }
         }
     except Exception as e:
@@ -384,9 +380,18 @@ async def health_check():
 async def root():
     """Root endpoint redirect to API info."""
     return {
-        "message": "LinkedIn Profile Sourcing API",
+        "message": "Streamlined LinkedIn Profile Sourcing API with AI Keywords",
+        "version": "5.0.0",
+        "features": [
+            "AI-powered keyword extraction from job descriptions",
+            "Optimized search: site:linkedin.com/in + targeted terms",
+            "Two methods: rapid_api (fast) and google_crawler (free)",
+            "Comprehensive profile data extraction",
+            "Intelligent candidate scoring and ranking"
+        ],
         "docs": "/docs",
-        "api": "/api"
+        "api": "/api",
+        "example_query": 'site:linkedin.com/in "backend engineer" "fintech" "San Francisco" "Python"'
     }
 
 

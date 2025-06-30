@@ -14,15 +14,23 @@ OPENAI_MODEL = "gpt-4o-mini"  # Cost-effective model with good performance
 OPENAI_MAX_TOKENS = 2000
 OPENAI_TEMPERATURE = 0
 
-# LinkedIn Configuration
-LINKEDIN_EMAIL = os.getenv("LINKEDIN_EMAIL")
-LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD")
+# GitHub Configuration
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+# Zyte Proxy Configuration
+ZYTE_API_KEY = os.getenv("ZYTE_API_KEY", "afacf0f6b8b841f2892a166c3a102741")
+ZYTE_PROXY_URL = "http://api.zyte.com:8011"
+ZYTE_ENABLED = os.getenv("ZYTE_ENABLED", "True").lower() == "true"
 
 # Search Configuration
-DEFAULT_SEARCH_QUERY = os.getenv("SEARCH_QUERY", '"backend engineer" "fintech" "San Francisco"')
 GOOGLE_SEARCH_BASE_URL = "https://www.google.com/search"
 MAX_PROFILES = int(os.getenv("MAX_PROFILES", "20"))
 REQUEST_DELAY = int(os.getenv("REQUEST_DELAY", "2"))
+
+TESTING_MAX_PROFILES = 5  # Use 5 profiles for quick testing
+PRODUCTION_MAX_PROFILES = 10  # Use 10 profiles for production
+
+
 
 # Browser Configuration
 HEADLESS = os.getenv("HEADLESS", "False").lower() == "true"
@@ -35,7 +43,12 @@ PLAYWRIGHT_ARGS = [
     "--disable-dev-shm-usage",
     "--no-sandbox",
     "--disable-web-security",
-    "--disable-features=VizDisplayCompositor"
+    "--disable-features=VizDisplayCompositor",
+    "--ignore-certificate-errors",
+    "--ignore-ssl-errors",
+    "--ignore-certificate-errors-spki-list",
+    "--ignore-ssl-errors-spki-list",
+    "--disable-ssl-verification"
 ]
 
 # File Paths
@@ -83,13 +96,7 @@ def validate_config() -> None:
     errors = []
     
     if not OPENAI_API_KEY:
-        errors.append("OPENAI_API_KEY is required")
-    
-    if not LINKEDIN_EMAIL:
-        errors.append("LINKEDIN_EMAIL is required")
-    
-    if not LINKEDIN_PASSWORD:
-        errors.append("LINKEDIN_PASSWORD is required")
+        errors.append("OPENAI_API_KEY is required for AI features")
     
     if errors:
         raise ValueError(f"Configuration errors: {', '.join(errors)}")
@@ -97,13 +104,23 @@ def validate_config() -> None:
     print("✅ Configuration validated successfully")
 
 def get_browser_config() -> Dict[str, Any]:
-    """Get browser configuration for Playwright."""
-    return {
+    """Get browser configuration for Playwright with optional Zyte proxy."""
+    config = {
         "headless": HEADLESS,
         "args": PLAYWRIGHT_ARGS,
         "user_agent": BROWSER_USER_AGENT,
         "viewport": {"width": 1920, "height": 1080}
     }
+    
+    # Add Zyte proxy configuration if enabled
+    if ZYTE_ENABLED and ZYTE_API_KEY:
+        config["proxy"] = {
+            "server": ZYTE_PROXY_URL,
+            "username": ZYTE_API_KEY,
+            "password": ""
+        }
+    
+    return config
 
 def get_openai_config() -> Dict[str, Any]:
     """Get OpenAI configuration."""
