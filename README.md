@@ -1,6 +1,7 @@
 # 🚀 LinkedIn Profile Extractor - Complete System
 
-[![LinkedIn Extractor Demo](https://img.youtube.com/vi/paGV7Je6JVA/0.jpg)](https://www.youtube.com/watch?v=paGV7Je6JVA)
+[![LinkedIn Extractor Demo](https://img.youtube.com/vi/paGV7Je6JVA/maxresdefault.jpg)](https://www.youtube.com/watch?v=paGV7Je6JVA)
+
 
 AI-powered LinkedIn profile sourcing with dual extraction methods, GitHub integration, intelligent scoring, and enterprise-grade architecture. Features **RapidAPI**, **Google Crawler**, **Zyte Proxy**, **Playwright**, **Redis Caching**, and **ARQ Workers**.
 
